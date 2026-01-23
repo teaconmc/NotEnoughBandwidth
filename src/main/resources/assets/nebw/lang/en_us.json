@@ -1,0 +1,7 @@
+{
+  "neb.profiler.client.start": "Client-side network profiler started.",
+  "neb.profiler.client.stop": "Client-side network profiler stopped, saving results ...",
+  "neb.profiler.server.start": "Server-side network profiler started.",
+  "neb.profiler.server.stop": "Server-side network profiler stopped, saving results ...",
+  "neb.profiler.result": "Profiler has been saved to %1$s"
+}

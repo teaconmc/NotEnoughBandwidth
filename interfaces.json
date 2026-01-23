@@ -1,0 +1,8 @@
+{
+  "net/minecraft/network/protocol/common/ClientboundCustomPayloadPacket": [
+    "org/teacon/neb/network/VanillaCustomPayload"
+  ],
+  "net/minecraft/network/protocol/common/ServerboundCustomPayloadPacket": [
+    "org/teacon/neb/network/VanillaCustomPayload"
+  ]
+}
