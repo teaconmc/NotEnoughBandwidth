@@ -148,13 +148,13 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
             ChunkTrackingView.difference(major, next, chunkPos -> {
                 if (cache.remove(chunkPos.pack()) == NO_CACHE) {
                     onEnter.accept(chunkPos);
+                    LOGGER.debug("Cache miss at {} in {}'s chunk cache.", chunkPos, player.getPlainTextName());
                 } else {
                     LOGGER.debug("Cache hit at {} in {}'s chunk cache.", chunkPos, player.getPlainTextName());
                 }
             }, chunkPos -> {
                 if (next.center().distanceSquared(chunkPos) <= chunkCacheDistanceSquared) {
                     cache.put(chunkPos.pack(), now);
-                    LOGGER.debug("Add {} into {}'s chunk cache: left just now.", chunkPos, player.getPlainTextName());
                 }
             });
 
