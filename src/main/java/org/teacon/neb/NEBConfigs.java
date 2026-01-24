@@ -35,11 +35,32 @@ public final class NEBConfigs {
     @SubscribeEvent
     private static void on(FMLConstructModEvent event) {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
-        COMPRESS_WINDOW_SIZE_LOG = builder.defineInRange("compress_window_size_log", 20, 19, 27);
+        COMPRESS_WINDOW_SIZE_LOG = builder
+                .comment(" The base-2 logarithm of the compression window size. See: https://www.jefftk.com/p/zstd-window-size")
+                .defineInRange("zstd.window_log", 20, 19, 27);
 
-        CHUNK_CACHE_BUFFER_SIZE = builder.defineInRange("chunk_cache_buffer_size", 60, 0, Integer.MAX_VALUE);
-        CHUNK_CACHE_DISTANCE = builder.defineInRange("chunk_cache_distance", 5, 0, Integer.MAX_VALUE);
-        CHUNK_CACHE_TIMEOUT = builder.defineInRange("chunk_cache_timeout", 60, 0, Integer.MAX_VALUE);
+        builder.comment("""
+                 Chunk cache is used to temporarily retain chunks that have recently left the major view,
+                 in order to reduce frequent enter/leave churn when the player moves near view boundaries.
+                 A cached chunk will be evicted if any of the following conditions is met:
+                 It has not been within the major view boundary for a configured amount of time (timeout).
+                 It is farther than the allowed cache distance from the current view center.
+                 The cache exceeds the configured size limit, in which case the oldest cached chunks are removed first.
+                """.split("\n")
+        ).push("chunk_cache");
+        CHUNK_CACHE_BUFFER_SIZE = builder
+                .comment(" The maximum capacity of the cache queue for recently visited chunks.")
+                .defineInRange("buffer_size", 60, 0, Integer.MAX_VALUE);
+        CHUNK_CACHE_DISTANCE = builder
+                .comment(" The distance threshold in chunks.")
+                .comment(" If the distance between a cached chunk and the player exceeds")
+                .comment(" this value plus the view distance, the chunk will be forgotten.")
+                .defineInRange("distance", 5, 0, Integer.MAX_VALUE);
+        CHUNK_CACHE_TIMEOUT = builder
+                .comment(" The time (in seconds) since the client's last visit.")
+                .comment(" If this timeout is exceeded, the cached chunks will be forgotten.")
+                .defineInRange("timeout", 60, 0, Integer.MAX_VALUE);
+        builder.pop();
 
         PACKET_BLACKLIST = builder.defineList(
                 "packet_blacklist", ArrayList::new, () -> "",

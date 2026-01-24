@@ -10,6 +10,7 @@ import net.minecraft.network.protocol.game.ClientboundSetChunkCacheCenterPacket;
 import net.minecraft.server.level.ChunkTrackingView;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
+import org.intellij.lang.annotations.MagicConstant;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.teacon.neb.NEBConfigs;
@@ -170,10 +171,11 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
 
         // Remove legacy cache.
         enumerate((pos, time) -> {
-            if (time <= now - chunkCacheTimeout || cache.size() >= chunkCacheBufferSize) {
+            boolean legacy = time <= now - chunkCacheTimeout;
+            if (legacy || cache.size() >= chunkCacheBufferSize) {
                 ChunkPos chunkPos = ChunkPos.unpack(pos);
                 onLeave.accept(chunkPos);
-                LOGGER.debug("Remove {} from {}'s chunk cache: timeout / buffer is full.", chunkPos, player.getPlainTextName());
+                LOGGER.debug("Remove {} from {}'s chunk cache: {}", chunkPos, player.getPlainTextName(), legacy ? "timeout" : "buffer is full");
                 return CacheConsumer.REMOVE;
             } else {
                 return CacheConsumer.STOP;
@@ -182,12 +184,13 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
 
         major = next;
     }
+
     @FunctionalInterface
     private interface CacheConsumer {
-
         byte CONTINUE = 0, REMOVE = 1, STOP = 2;
-        byte accept(long pos, long time);
 
+        @MagicConstant(flags = { CONTINUE, REMOVE, STOP })
+        byte accept(long pos, long time);
     }
 
     private void enumerate(CacheConsumer consumer) {
@@ -195,14 +198,12 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
         while (iterator.hasNext()) {
             Long2LongMap.Entry entry = iterator.next();
 
-            switch (consumer.accept(entry.getLongKey(), entry.getLongValue())) {
-                case CacheConsumer.CONTINUE -> {
-                }
-                case CacheConsumer.REMOVE -> iterator.remove();
-                case CacheConsumer.STOP -> {
-                    return;
-                }
-                default -> throw new AssertionError();
+            byte v = consumer.accept(entry.getLongKey(), entry.getLongValue());
+            if ((v & CacheConsumer.REMOVE) != 0) {
+                iterator.remove();
+            }
+            if ((v & CacheConsumer.STOP) != 0) {
+                return;
             }
         }
     }
