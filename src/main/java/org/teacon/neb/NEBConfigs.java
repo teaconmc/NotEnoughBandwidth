@@ -43,9 +43,9 @@ public final class NEBConfigs {
                  Chunk cache is used to temporarily retain chunks that have recently left the major view,
                  in order to reduce frequent enter/leave churn when the player moves near view boundaries.
                  A cached chunk will be evicted if any of the following conditions is met:
-                 It has not been within the major view boundary for a configured amount of time (timeout).
-                 It is farther than the allowed cache distance from the current view center.
-                 The cache exceeds the configured size limit, in which case the oldest cached chunks are removed first.
+                 - It has not been within the major view boundary for a configured amount of time (timeout).
+                 - It is farther than the allowed cache distance from the current view center.
+                 - The cache exceeds the configured size limit, in which case the oldest cached chunks are removed first.
                 """.split("\n")
         ).push("chunk_cache");
         CHUNK_CACHE_BUFFER_SIZE = builder
