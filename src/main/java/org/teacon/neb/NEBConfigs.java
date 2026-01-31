@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableSet;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.PacketType;
 import net.minecraft.resources.Identifier;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.config.IConfigSpec;
@@ -36,29 +37,35 @@ public final class NEBConfigs {
     private static void on(FMLConstructModEvent event) {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
         COMPRESS_WINDOW_SIZE_LOG = builder
-                .comment(" The base-2 logarithm of the compression window size. See: https://www.jefftk.com/p/zstd-window-size")
+                .comment(formatComments("""
+                        The base-2 logarithm of the compression window size. See: https://www.jefftk.com/p/zstd-window-size
+                        """))
                 .defineInRange("zstd.window_log", 20, 19, 27);
 
-        builder.comment("""
-                 Chunk cache is used to temporarily retain chunks that have recently left the major view,
-                 in order to reduce frequent enter/leave churn when the player moves near view boundaries.
-                 A cached chunk will be evicted if any of the following conditions is met:
-                 - It has not been within the major view boundary for a configured amount of time (timeout).
-                 - It is farther than the allowed cache distance from the current view center.
-                 - The cache exceeds the configured size limit, in which case the oldest cached chunks are removed first.
-                """.split("\n")
-        ).push("chunk_cache");
+        builder.comment(formatComments("""
+                        Chunk cache is used to temporarily retain chunks that have recently left the major view,
+                        in order to reduce frequent enter/leave churn when the player moves near view boundaries.
+                        A cached chunk will be evicted if any of the following conditions is met:
+                        - It has not been within the major view boundary for a configured amount of time (timeout).
+                        - It is farther than the allowed cache distance from the current view center.
+                        - The cache exceeds the configured size limit, in which case the oldest cached chunks are removed first.
+                        """))
+                .push("chunk_cache");
         CHUNK_CACHE_BUFFER_SIZE = builder
-                .comment(" The maximum capacity of the cache queue for recently visited chunks.")
+                .comment(formatComments("The maximum capacity of the cache queue for recently visited chunks."))
                 .defineInRange("buffer_size", 60, 0, Integer.MAX_VALUE);
         CHUNK_CACHE_DISTANCE = builder
-                .comment(" The distance threshold in chunks.")
-                .comment(" If the distance between a cached chunk and the player exceeds")
-                .comment(" this value plus the view distance, the chunk will be forgotten.")
+                .comment(formatComments("""
+                        The distance threshold in chunks.
+                        If the distance between a cached chunk and the player exceeds
+                        this value plus the view distance, the chunk will be forgotten.
+                        """))
                 .defineInRange("distance", 5, 0, Integer.MAX_VALUE);
         CHUNK_CACHE_TIMEOUT = builder
-                .comment(" The time (in seconds) since the client's last visit.")
-                .comment(" If this timeout is exceeded, the cached chunks will be forgotten.")
+                .comment(formatComments("""
+                        The time (in seconds) since the client's last visit.
+                        If this timeout is exceeded, the cached chunks will be forgotten.
+                        """))
                 .defineInRange("timeout", 60, 0, Integer.MAX_VALUE);
         builder.pop();
 
@@ -69,9 +76,20 @@ public final class NEBConfigs {
         CONFIG_SPEC = builder.build();
 
         NotEnoughBandwidth.MOD_CONTAINER.registerConfig(ModConfig.Type.SERVER, CONFIG_SPEC);
-        NotEnoughBandwidth.MOD_CONTAINER.registerExtensionPoint(
-                IConfigScreenFactory.class, ConfigurationScreen::new
-        );
+    }
+
+    @EventBusSubscriber(modid = NotEnoughBandwidth.MODID, value = Dist.CLIENT)
+    private static class Client {
+        @SubscribeEvent
+        private static void on(FMLConstructModEvent event) {
+            NotEnoughBandwidth.MOD_CONTAINER.registerExtensionPoint(
+                    IConfigScreenFactory.class, ConfigurationScreen::new
+            );
+        }
+    }
+
+    private static String[] formatComments(String comments) {
+        return comments.lines().map(s -> " " + s).toArray(String[]::new);
     }
 
     @SubscribeEvent

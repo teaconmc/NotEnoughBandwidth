@@ -28,7 +28,8 @@ import javax.annotation.ParametersAreNonnullByDefault;
  */
 @MethodsReturnNonnullByDefault
 @ParametersAreNonnullByDefault
-public record IndexPacket(PacketType<@NotNull IndexPacket> type, CustomPacketPayload payload) implements Packet<@NotNull PacketListener> {
+public record IndexPacket(PacketType<@NotNull IndexPacket> type,
+                          CustomPacketPayload payload) implements Packet<@NotNull PacketListener> {
     public static final PacketType<@NotNull IndexPacket> S_TYPE = new PacketType<>(PacketFlow.SERVERBOUND, NotEnoughBandwidth.id("c2s/indexed"));
     public static final PacketType<@NotNull IndexPacket> C_TYPE = new PacketType<>(PacketFlow.CLIENTBOUND, NotEnoughBandwidth.id("s2c/indexed"));
 
@@ -92,8 +93,10 @@ public record IndexPacket(PacketType<@NotNull IndexPacket> type, CustomPacketPay
     @Override
     public void handle(PacketListener listener) {
         switch (listener.flow()) {
-            case CLIENTBOUND -> ((ClientCommonPacketListener) listener).handleCustomPayload(payload.toVanillaClientbound());
-            case SERVERBOUND -> ((ServerCommonPacketListener) listener).handleCustomPayload(payload.toVanillaServerbound());
+            case CLIENTBOUND ->
+                    ((ClientCommonPacketListener) listener).handleCustomPayload(payload.toVanillaClientbound());
+            case SERVERBOUND ->
+                    ((ServerCommonPacketListener) listener).handleCustomPayload(payload.toVanillaServerbound());
         }
     }
 }

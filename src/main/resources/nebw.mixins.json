@@ -10,6 +10,7 @@
     "CustomPayloadPacketMixin",
     "GameProtocolsMixin",
     "PacketDecoderMixin",
+    "PlayerChunkSenderMixin",
     "ProtocolSwapHandlerMixin",
     "nf.NetworkRegistryMixin"
   ],

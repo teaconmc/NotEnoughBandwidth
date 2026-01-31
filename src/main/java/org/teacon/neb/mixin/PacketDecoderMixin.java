@@ -26,7 +26,8 @@ public class PacketDecoderMixin {
     private String transformPacketType(Object _0, @Local(ordinal = 0) Packet<?> packet) {
         Identifier payloadType = switch (packet) {
             case VanillaCustomPayload payload -> payload.payload().type().id();
-            case IndexPacket(PacketType<@NotNull IndexPacket> ignored, CustomPacketPayload payload) -> payload.type().id();
+            case IndexPacket(PacketType<@NotNull IndexPacket> ignored, CustomPacketPayload payload) ->
+                    payload.type().id();
             default -> null;
         };
 

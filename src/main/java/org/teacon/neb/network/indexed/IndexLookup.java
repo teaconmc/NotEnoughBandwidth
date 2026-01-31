@@ -56,7 +56,7 @@ public final class IndexLookup {
         }
 
         locations.sort(null);
-            for (int i = 0; i < locations.size(); i++) {
+        for (int i = 0; i < locations.size(); i++) {
             Identifier location = locations.get(i);
             if (location2id.put(location, i) != EMPTY_INT || id2location.put(i, location) != null) {
                 throw new RuntimeException("Duplicate packet registration: " + location);

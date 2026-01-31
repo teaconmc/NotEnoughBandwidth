@@ -9,13 +9,14 @@ import net.minecraft.network.PacketEncoder;
 import net.minecraft.network.VarInt;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketType;
+import org.jetbrains.annotations.NotNull;
 import org.teacon.neb.NotEnoughBandwidth;
 import org.teacon.neb.network.aggregate.CompressedPacket;
 import org.teacon.neb.profiler.ProfilerChannel;
 import org.teacon.neb.profiler.Snapshot;
+import org.teacon.neb.utils.vm.LookupAccess;
 
 import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.Collection;
 import java.util.List;
@@ -30,7 +31,7 @@ public final class CompressEncoder extends MessageToMessageEncoder<CompressEncod
 
     static {
         try {
-            ENCODE = MethodHandles.privateLookupIn(PacketEncoder.class, MethodHandles.lookup()).findVirtual(
+            ENCODE = LookupAccess.IMPL_LOOKUP.findVirtual(
                     PacketEncoder.class, "encode", MethodType.methodType(void.class, ChannelHandlerContext.class, Packet.class, ByteBuf.class)
             );
         } catch (ReflectiveOperationException e) {
@@ -41,7 +42,7 @@ public final class CompressEncoder extends MessageToMessageEncoder<CompressEncod
     private CompressEncoder() {
     }
 
-    public record CompressedTransfer(PacketType<CompressedPacket> type, Collection<Packet<?>> packets) {
+    public record CompressedTransfer(PacketType<@NotNull CompressedPacket> type, Collection<Packet<?>> packets) {
     }
 
     @Override

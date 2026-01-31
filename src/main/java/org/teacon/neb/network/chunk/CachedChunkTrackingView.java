@@ -101,10 +101,10 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
      * updated in-place; otherwise, a new {@link CachedChunkTrackingView} is
      * created and installed.</p>
      *
-     * @param player the player whose chunk tracking is being updated
+     * @param player             the player whose chunk tracking is being updated
      * @param playerViewDistance the player's view distance
-     * @param onEnter callback invoked when a chunk becomes visible
-     * @param onLeave callback invoked when a chunk is no longer tracked
+     * @param onEnter            callback invoked when a chunk becomes visible
+     * @param onLeave            callback invoked when a chunk is no longer tracked
      */
     public static void onUpdateChunkTracking(ServerPlayer player, int playerViewDistance, Consumer<ChunkPos> onEnter, Consumer<ChunkPos> onLeave) {
         ChunkTrackingView currentTrackingView = player.getChunkTrackingView();
@@ -189,7 +189,7 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
     private interface CacheConsumer {
         byte CONTINUE = 0, REMOVE = 1, STOP = 2;
 
-        @MagicConstant(flags = { CONTINUE, REMOVE, STOP })
+        @MagicConstant(flags = {CONTINUE, REMOVE, STOP})
         byte accept(long pos, long time);
     }
 

@@ -30,11 +30,12 @@ import net.neoforged.neoforge.server.permission.nodes.PermissionNode;
 import net.neoforged.neoforge.server.permission.nodes.PermissionTypes;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.teacon.neb.network.chunk.preshare.providers.PresharedChunkServer;
 import org.teacon.neb.profiler.ProfilerChannel;
 import org.teacon.neb.profiler.impl.SimpleProfiler;
+import org.teacon.neb.utils.vm.LookupAccess;
 
 import java.io.IOException;
-import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
@@ -58,7 +59,7 @@ public class NEBCommands {
 
         static {
             List<Class<?>> candidates = new ArrayList<>(1);
-            for (int i = 1; true; i ++) {
+            for (int i = 1; true; i++) {
                 try {
                     candidates.add(Class.forName(ServerPlayer.class.getName() + "$" + i));
                 } catch (ClassNotFoundException e) {
@@ -79,8 +80,7 @@ public class NEBCommands {
 
             try {
                 CLAZZ = field.getDeclaringClass();
-                SERVER_PLAYER = MethodHandles.privateLookupIn(CLAZZ, MethodHandles.lookup())
-                        .findVarHandle(CLAZZ, field.getName(), ServerPlayer.class)
+                SERVER_PLAYER = LookupAccess.IMPL_LOOKUP.findVarHandle(CLAZZ, field.getName(), ServerPlayer.class)
                         .withInvokeBehavior();
             } catch (ReflectiveOperationException e) {
                 throw new ExceptionInInitializerError(e);
@@ -93,7 +93,7 @@ public class NEBCommands {
         }
     }
 
-    private static final PermissionNode<@NotNull Boolean> PROFILER_PERMISSION = new PermissionNode<>(
+    private static final PermissionNode<@NotNull Boolean> ADMIN_PERMISSION = new PermissionNode<>(
             NotEnoughBandwidth.id("command.admin"), PermissionTypes.BOOLEAN,
             (player, uuid, context) -> {
                 MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
@@ -105,22 +105,63 @@ public class NEBCommands {
             }
     );
 
-    private static boolean checkServerProfilerPermission(CommandSourceStack source) {
-        ServerPlayer player = PlayerCommandSourceAccessor.from(source.source);
-        return player != null && PermissionAPI.getPermission(player, PROFILER_PERMISSION);
+    private static boolean checkAdministrator(CommandSourceStack source) {
+        if (source.source instanceof MinecraftServer) {
+            return true;
+        } else {
+            ServerPlayer player = PlayerCommandSourceAccessor.from(source.source);
+            return player != null && PermissionAPI.getPermission(player, ADMIN_PERMISSION);
+        }
     }
 
     @SubscribeEvent
     public static void on(PermissionGatherEvent.Nodes event) {
-        event.addNodes(PROFILER_PERMISSION);
+        event.addNodes(ADMIN_PERMISSION);
     }
 
     @SubscribeEvent
     private static void on(RegisterCommandsEvent event) {
         event.getDispatcher().register(
                 Commands.literal("neb")
+                        .then(Commands.literal("preshared")
+                                .requires(NEBCommands::checkAdministrator)
+                                .then(Commands.literal("create").executes(context -> {
+                                    MinecraftServer server = context.getSource().getServer();
+                                    server.getPlayerList().broadcastSystemMessage(Component.translatable("neb.preshared.create.working"), true);
+
+                                    try {
+                                        PresharedChunkServer.create(server);
+                                    } catch (Throwable e) {
+                                        NotEnoughBandwidth.LOGGER.warn("Cannot create preshared-chunk data.", e);
+                                        context.getSource().sendSystemMessage(Component.translatable("neb.preshared.create.failed"));
+                                        return -1;
+                                    }
+                                    context.getSource().sendSystemMessage(Component.translatable("neb.preshared.create.success"));
+
+                                    return Command.SINGLE_SUCCESS;
+                                }))
+                                .then(Commands.literal("load").executes(context -> {
+                                    MinecraftServer server = context.getSource().getServer();
+
+                                    for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                                        player.connection.disconnect(Component.translatable("neb.preshared.create.connect_again"));
+                                    }
+                                    try {
+                                        PresharedChunkServer.load(server);
+                                    } catch (IOException e) {
+                                        NotEnoughBandwidth.LOGGER.warn("Cannot load preshared-chunk data.", e);
+                                        return -2;
+                                    }
+
+                                    return Command.SINGLE_SUCCESS;
+                                }))
+                                .then(Commands.literal("unload").executes(context -> {
+                                    PresharedChunkServer.unload();
+                                    return Command.SINGLE_SUCCESS;
+                                }))
+                        )
                         .then(Commands.literal("profiler")
-                                .requires(NEBCommands::checkServerProfilerPermission)
+                                .requires(NEBCommands::checkAdministrator)
                                 .then(Commands.literal("start").executes(context -> {
                                     sendResult(context, ProfilerChannel.SERVER.add(new SimpleProfiler()));
                                     context.getSource().sendSystemMessage(Component.translatable("neb.profiler.server.start"));
@@ -153,9 +194,22 @@ public class NEBCommands {
     private static void sendResult(CommandContext<CommandSourceStack> context, @Nullable SimpleProfiler profiler) {
         if (profiler != null) {
             context.getSource().sendSystemMessage(Component.translatable("neb.profiler.server.stop"));
-            ServerPlayer player = PlayerCommandSourceAccessor.from(context.getSource().source);
-            if (player != null) {
-                player.connection.send(new SimpleProfileResult(profiler.build()));
+
+            String result = profiler.build();
+
+            if (context.getSource().source instanceof MinecraftServer) {
+                try {
+                    Path path = Files.createTempFile("neb-", ".csv");
+                    Files.writeString(path, result, StandardCharsets.UTF_8);
+                    context.getSource().sendSystemMessage(Component.translatable("neb.profiler.result", path.toString()));
+                } catch (IOException e) {
+                    NotEnoughBandwidth.LOGGER.warn("Cannot write profile result.", e);
+                }
+            } else {
+                ServerPlayer player = PlayerCommandSourceAccessor.from(context.getSource().source);
+                if (player != null) {
+                    player.connection.send(new SimpleProfileResult(result));
+                }
             }
         }
     }

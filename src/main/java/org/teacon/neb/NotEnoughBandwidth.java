@@ -3,12 +3,13 @@ package org.teacon.neb;
 import com.github.luben.zstd.Zstd;
 import com.mojang.logging.LogUtils;
 import net.minecraft.resources.Identifier;
-import net.neoforged.api.distmarker.Dist;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import org.slf4j.Logger;
+import org.teacon.neb.utils.vm.LookupAccess;
 
-import java.lang.invoke.MethodHandles;
+import java.util.Arrays;
 
 /**
  * @author USS_Shenzhou
@@ -21,7 +22,7 @@ public final class NotEnoughBandwidth {
 
     public NotEnoughBandwidth(ModContainer container) {
         try {
-            MethodHandles.lookup().ensureInitialized(Zstd.class);
+            LookupAccess.IMPL_LOOKUP.ensureInitialized(Zstd.class);
         } catch (IllegalAccessException e) {
             throw new AssertionError(e);
         } catch (UnsatisfiedLinkError e) {
@@ -29,6 +30,10 @@ public final class NotEnoughBandwidth {
                     "NotEnoughBandwidth cannot load ZStandard JNI for your platform. " +
                             "Please report this issue to TeaCon."
             );
+        }
+
+        if (Arrays.stream(Heightmap.Types.values()).filter(Heightmap.Types::sendToClient).count() != 3) {
+            throw new UnsupportedOperationException("NotEnoughBandwidth assumes that there're only 3 client-synced heightmap.");
         }
 
         MOD_CONTAINER = container;

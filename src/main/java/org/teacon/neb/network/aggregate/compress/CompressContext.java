@@ -25,13 +25,17 @@ public final class CompressContext {
 
     private static final AttributeKey<CompressContext> CONTEXT_ACCESSOR = AttributeKey.valueOf(NotEnoughBandwidth.id("compress_context").toString());
 
-    // FIXME: synchronized might cause performance overload.
-    public synchronized static CompressContext get(ChannelHandlerContext context) {
+    public static CompressContext get(ChannelHandlerContext context) {
         Attribute<CompressContext> attribute = context.channel().attr(CONTEXT_ACCESSOR);
         CompressContext cc = attribute.get();
         if (cc == null) {
-            cc = new CompressContext(context);
-            attribute.set(cc);
+            synchronized (CompressContext.class) {
+                cc = attribute.get();
+                if (cc == null) {
+                    cc = ofConnection(context);
+                    attribute.set(cc);
+                }
+            }
         }
         return cc;
     }
@@ -42,18 +46,34 @@ public final class CompressContext {
     @SuppressWarnings({"unused", "FieldCanBeLocal"}) // Keep a reference only.
     private final Cleaner.Cleanable cleanable;
 
-    public CompressContext(ChannelHandlerContext context) {
-        this.compress = new ZstdCompressCtx()
+    private static CompressContext ofConnection(ChannelHandlerContext context) {
+        ZstdCompressCtx compress = new ZstdCompressCtx()
                 .setLevel(Zstd.defaultCompressionLevel())
                 .setChecksum(false)
                 .setMagicless(true)
                 .setContentSize(false);
-        this.decompress = new ZstdDecompressCtx()
+        ZstdDecompressCtx decompress = new ZstdDecompressCtx()
                 .setMagicless(true);
 
         if (ConnectionUtils.getConnection(context).getSending() == PacketFlow.CLIENTBOUND) {
-            this.compress.setWindowLog(NEBConfigs.COMPRESS_WINDOW_SIZE_LOG.get());
+            compress.setWindowLog(NEBConfigs.COMPRESS_WINDOW_SIZE_LOG.get());
         }
+
+        return new CompressContext(compress, decompress);
+    }
+
+    public static CompressContext ofPresharedChunk() {
+        ZstdCompressCtx compress = new ZstdCompressCtx()
+                .setLevel(22)
+                .setChecksum(true);
+        ZstdDecompressCtx decompress = new ZstdDecompressCtx();
+
+        return new CompressContext(compress, decompress);
+    }
+
+    private CompressContext(ZstdCompressCtx compress, ZstdDecompressCtx decompress) {
+        this.compress = compress;
+        this.decompress = decompress;
 
         // TODO: We use Cleaner to close unused context for now. Maybe use a better implementation instead?
         this.cleanable = CLEANER.register(this, new CleanableImpl(compress::close, decompress::close));
@@ -147,5 +167,9 @@ public final class CompressContext {
             throw new AssertionError();
         }
         return target.position();
+    }
+
+    public void release() {
+        this.cleanable.clean();
     }
 }

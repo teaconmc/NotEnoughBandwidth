@@ -1,0 +1,159 @@
+package org.teacon.neb.network.chunk.preshare.providers;
+
+import com.google.common.collect.ImmutableMap;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundLevelChunkPacketData;
+import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
+import net.minecraft.network.protocol.game.ClientboundLightUpdatePacketData;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
+import org.teacon.neb.NotEnoughBandwidth;
+import org.teacon.neb.network.chunk.preshare.PresharedChunk;
+import org.teacon.neb.network.chunk.preshare.PresharedChunkGuardPacket;
+import org.teacon.neb.network.chunk.preshare.PresharedChunkPacket;
+import org.teacon.neb.network.chunk.preshare.data.BlockEntityInfo;
+import org.teacon.neb.network.chunk.preshare.data.LevelLightSection;
+import org.teacon.neb.network.chunk.preshare.data.SectionInstance;
+import org.teacon.neb.utils.ChunkRelativePos;
+import org.teacon.neb.utils.vm.LookupAccess;
+import org.teacon.neb.utils.vm.VectorSupport;
+
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodType;
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+@EventBusSubscriber(modid = NotEnoughBandwidth.MODID, value = Dist.CLIENT)
+public class PresharedChunkPacketClientImpl {
+    private static final MethodHandle CLCPD_NEW, CLCPD_BEI_NEW, CLUPD_NEW, CLCWLP_NEW;
+
+    static {
+        try {
+            CLCPD_NEW = LookupAccess.createConstructor(ClientboundLevelChunkPacketData.class, ImmutableMap.of(
+                    "heightmaps", Map.class,
+                    "buffer", byte[].class,
+                    "blockEntitiesData", List.class
+            ));
+            if (!CLCPD_NEW.type().equals(
+                    MethodType.methodType(ClientboundLevelChunkPacketData.class, Map.class, byte[].class, List.class)
+            )) {
+                throw new AssertionError();
+            }
+
+            CLCPD_BEI_NEW = LookupAccess.IMPL_LOOKUP.findConstructor(
+                    Class.forName("net.minecraft.network.protocol.game.ClientboundLevelChunkPacketData$BlockEntityInfo"),
+                    MethodType.methodType(void.class, int.class, int.class, BlockEntityType.class, CompoundTag.class)
+            ).asType(MethodType.methodType(Object.class, int.class, int.class, BlockEntityType.class, CompoundTag.class));
+
+            CLUPD_NEW = LookupAccess.createConstructor(ClientboundLightUpdatePacketData.class, ImmutableMap.of(
+                    "skyYMask", BitSet.class,
+                    "blockYMask", BitSet.class,
+                    "emptySkyYMask", BitSet.class,
+                    "emptyBlockYMask", BitSet.class,
+                    "skyUpdates", List.class,
+                    "blockUpdates", List.class
+            ));
+
+            CLCWLP_NEW = LookupAccess.createConstructor(ClientboundLevelChunkWithLightPacket.class, ImmutableMap.of(
+                    "x", int.class,
+                    "z", int.class,
+                    "chunkData", ClientboundLevelChunkPacketData.class,
+                    "lightData", ClientboundLightUpdatePacketData.class
+            ));
+        } catch (ReflectiveOperationException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
+
+    @SubscribeEvent
+    private static void on(RegisterClientPayloadHandlersEvent event) {
+        event.register(PresharedChunkPacket.TYPE, (packet, listener) -> {
+            PresharedChunk preshared = PresharedChunkClient.lookup.getChunk(listener.player().level(), packet.pos());
+            if (preshared == null) {
+                throw new IllegalStateException("Receiving unknown preshared-chunks.");
+            }
+
+            ClientboundLevelChunkWithLightPacket pkt = apply(packet, preshared);
+            listener.enqueueWork(() -> listener.handle(pkt));
+        });
+
+        event.register(PresharedChunkGuardPacket.TYPE, (packet, listener) -> {
+            UUID remoteVersion = packet.version(), localVersion = PresharedChunkClient.readVersion();
+            if (!remoteVersion.equals(localVersion)) {
+                listener.disconnect(Component.translatable("neb.preshared.version_mismatch", remoteVersion.toString(), localVersion.toString()));
+            }
+        });
+    }
+
+    private static ClientboundLevelChunkPacketData applyChunk(PresharedChunkPacket packet, PresharedChunk base) {
+        Map<Heightmap.Types, long[]> heightmaps = packet.heightmaps().apply(base.heightmaps());
+        byte[] buffer = SectionInstance.Diff.apply(base.sections(), packet.sections());
+        List<Object> blockEntities = new ArrayList<>();
+        for (BlockEntityInfo info : BlockEntityInfo.Diff.apply(base.blockEntities(), packet.blockEntities())) {
+            ChunkRelativePos pos = info.pos();
+
+            try {
+                blockEntities.add(CLCPD_BEI_NEW.invokeExact((pos.x() << 4) | pos.z(), (int) pos.y(), info.type(), info.data()));
+            } catch (Throwable e) {
+                throw LookupAccess.raise(e);
+            }
+        }
+
+        try {
+            return (ClientboundLevelChunkPacketData) CLCPD_NEW.invokeExact(heightmaps, buffer, blockEntities);
+        } catch (Throwable e) {
+            throw LookupAccess.raise(e);
+        }
+    }
+
+    private static ClientboundLightUpdatePacketData applyLight(PresharedChunkPacket packet) {
+        BitSet skyYMask = new BitSet();
+        BitSet blockYMask = new BitSet();
+        BitSet emptySkyYMask = new BitSet();
+        BitSet emptyBlockYMask = new BitSet();
+        List<byte[]> skyUpdates = new ArrayList<>();
+        List<byte[]> blockUpdates = new ArrayList<>();
+
+        for (int i = 0; i < packet.lights().size(); i++) {
+            LevelLightSection light = packet.lights().get(i);
+            applyLightType(light.block(), i, blockYMask, emptyBlockYMask, blockUpdates);
+            applyLightType(light.sky(), i, skyYMask, emptySkyYMask, skyUpdates);
+        }
+
+        try {
+            return (ClientboundLightUpdatePacketData) CLUPD_NEW.invokeExact(skyYMask, blockYMask, emptySkyYMask, emptyBlockYMask, skyUpdates, blockUpdates);
+        } catch (Throwable e) {
+            throw LookupAccess.raise(e);
+        }
+    }
+
+    private static void applyLightType(byte[] lights, int sectionIndex, BitSet yMask, BitSet emptyYMask, List<byte[]> updates) {
+        if (VectorSupport.isEmpty(lights)) {
+            emptyYMask.set(sectionIndex);
+        } else {
+            yMask.set(sectionIndex);
+            updates.add(lights);
+        }
+    }
+
+    private static ClientboundLevelChunkWithLightPacket apply(PresharedChunkPacket packet, PresharedChunk base) {
+        ChunkPos pos = base.pos();
+        ClientboundLevelChunkPacketData chunk = applyChunk(packet, base);
+        ClientboundLightUpdatePacketData light = applyLight(packet);
+
+        try {
+            return (ClientboundLevelChunkWithLightPacket) CLCWLP_NEW.invokeExact(pos.x(), pos.z(), chunk, light);
+        } catch (Throwable e) {
+            throw LookupAccess.raise(e);
+        }
+    }
+}

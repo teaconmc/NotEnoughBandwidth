@@ -9,7 +9,6 @@ import net.minecraft.network.Connection;
 import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.PacketDecoder;
 import net.minecraft.network.PacketEncoder;
-import net.minecraft.network.PacketSendListener;
 import net.minecraft.network.ProtocolInfo;
 import net.minecraft.network.UnconfiguredPipelineHandler;
 import net.minecraft.network.protocol.Packet;
@@ -48,7 +47,7 @@ public abstract class ConnectionMixin {
     }
 
     @Inject(method = "configureSerialization", at = @At("TAIL"))
-    private static void onConfigureSerialization(ChannelPipeline pipeline, PacketFlow flow, boolean memoryOnly, BandwidthDebugMonitor bandwithDebugMonitor, CallbackInfo ci) {
+    private static void onConfigureSerialization(ChannelPipeline pipeline, PacketFlow flow, boolean memoryOnly, BandwidthDebugMonitor monitor, CallbackInfo ci) {
         if (pipeline.get("encoder") instanceof PacketEncoder<?>) {
             pipeline.addAfter("encoder", CompressEncoder.ID, CompressEncoder.INSTANCE);
         }

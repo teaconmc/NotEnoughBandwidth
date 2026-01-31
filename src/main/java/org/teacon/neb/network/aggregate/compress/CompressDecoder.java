@@ -13,9 +13,9 @@ import org.teacon.neb.NotEnoughBandwidth;
 import org.teacon.neb.network.aggregate.CompressedPacket;
 import org.teacon.neb.profiler.ProfilerChannel;
 import org.teacon.neb.profiler.Snapshot;
+import org.teacon.neb.utils.vm.LookupAccess;
 
 import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
 import java.util.List;
@@ -31,12 +31,10 @@ public final class CompressDecoder extends MessageToMessageDecoder<CompressedPac
 
     static {
         try {
-            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(PacketDecoder.class, MethodHandles.lookup());
-
-            DECODE = lookup.findVirtual(
+            DECODE = LookupAccess.IMPL_LOOKUP.findVirtual(
                     PacketDecoder.class, "decode", MethodType.methodType(void.class, ChannelHandlerContext.class, ByteBuf.class, List.class)
             );
-            PROTOCOL_INFO = lookup.findVarHandle(PacketDecoder.class, "protocolInfo", ProtocolInfo.class);
+            PROTOCOL_INFO = LookupAccess.IMPL_LOOKUP.findVarHandle(PacketDecoder.class, "protocolInfo", ProtocolInfo.class);
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
         }
