@@ -30,18 +30,26 @@ public record LevelLightSection(
         int lightSectionCount = lightEngine.getLightSectionCount();
         List<LevelLightSection> lights = new ArrayList<>(lightSectionCount);
         for (int i = 0; i < lightSectionCount; i++) {
-            lights.add(createSection(lightEngine, SectionPos.of(pos, i + lightEngine.getMinLightSection())));
+            SectionPos sectionPos = SectionPos.of(pos, i + lightEngine.getMinLightSection());
+            lights.add(new LevelLightSection(
+                    createDataLayer(lightEngine, sectionPos, LightLayer.BLOCK),
+                    createDataLayer(lightEngine, sectionPos, LightLayer.SKY)
+            ));
         }
 
         return lights;
     }
 
-    private static LevelLightSection createSection(LevelLightEngine lightEngine, SectionPos pos) {
-        DataLayer block = lightEngine.getLayerListener(LightLayer.BLOCK).getDataLayerData(pos);
-        DataLayer sky = lightEngine.getLayerListener(LightLayer.SKY).getDataLayerData(pos);
-        return new LevelLightSection(
-                block != null ? block.getData() : new byte[2048],
-                sky != null ? sky.getData() : new byte[2048]
-        );
+    private static byte[] createDataLayer(LevelLightEngine lightEngine, SectionPos pos, LightLayer type) {
+        DataLayer data = lightEngine.getLayerListener(type).getDataLayerData(pos);
+        if (data == null) {
+            return new byte[2048];
+        }
+
+        byte[] val = data.getData();
+        if (val.length != 2048) {
+            throw new AssertionError(String.format("LightLayer should be 2048 bytes, but found %d bytes.", val.length));
+        }
+        return val;
     }
 }

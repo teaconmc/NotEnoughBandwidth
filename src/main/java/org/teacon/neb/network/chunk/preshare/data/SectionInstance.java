@@ -57,6 +57,9 @@ public record SectionInstance(
 
         public static List<Diff> from(List<SectionInstance> bases, LevelChunk chunk) {
             LevelChunkSection[] chunkSections = chunk.getSections();
+            if (chunkSections.length != bases.size()) {
+                throw new AssertionError(String.format("Invalid base, expecting %d sections, but found %d sections.", chunkSections.length, bases.size()));
+            }
 
             List<Diff> sections = new ArrayList<>(chunkSections.length);
             for (int i = 0; i < chunkSections.length; i++) {
@@ -75,7 +78,7 @@ public record SectionInstance(
         public static byte[] apply(List<SectionInstance> bases, List<Diff> diffs) {
             int length = bases.size();
             if (diffs.size() != length) {
-                throw new IllegalArgumentException();
+                throw new AssertionError(String.format("Invalid diff, expecting %d sections, but found %d sections.", bases.size(), diffs.size()));
             }
 
             int bufferLength = 0;

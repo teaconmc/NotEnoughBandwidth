@@ -35,7 +35,7 @@ public record HeightMap(
             if (i >= 0) {
                 long[] array = entry.getValue().getRawData();
                 if (array.length != SIZE) {
-                    throw new AssertionError();
+                    throw new AssertionError(String.format("Heightmap should be %d byte long, but found %d bytes.", SIZE, array.length));
                 }
                 System.arraycopy(array, 0, data, SIZE * i, SIZE);
             }
@@ -49,13 +49,17 @@ public record HeightMap(
         );
 
         public static Diff from(LevelChunk chunk, HeightMap base) {
+            if (base.heightmap.length != SIZE * TYPES.length) {
+                throw new AssertionError(String.format("Invalid base, expecting %d * %d bytes, but found %d bytes.", SIZE, TYPES.length, base.heightmap.length));
+            }
+
             long[] data = new long[base.heightmap.length];
             for (Map.Entry<Heightmap.Types, Heightmap> entry : chunk.getHeightmaps()) {
                 int i = ObjectArrays.binarySearch(HeightMap.TYPES, entry.getKey());
                 if (i >= 0) {
                     long[] array = entry.getValue().getRawData();
                     if (array.length != SIZE) {
-                        throw new AssertionError();
+                        throw new AssertionError(String.format("Heightmap should be %d byte long, but found %d bytes.", SIZE, array.length));
                     }
                     VectorSupport.xor(array, 0, base.heightmap, SIZE * i, data, SIZE * i, SIZE);
                 }
@@ -64,6 +68,13 @@ public record HeightMap(
         }
 
         public Map<Heightmap.Types, long[]> apply(HeightMap base) {
+            if (base.heightmap.length != SIZE * TYPES.length) {
+                throw new AssertionError(String.format("Invalid base, expecting %d * %d bytes, but found %d bytes.", SIZE, TYPES.length, base.heightmap.length));
+            }
+            if (heightmap.length != SIZE * TYPES.length) {
+                throw new AssertionError(String.format("Invalid diff, expecting %d * %d bytes, but found %d bytes.", SIZE, TYPES.length, heightmap.length));
+            }
+
             Map<Heightmap.Types, long[]> heightmaps = new EnumMap<>(Heightmap.Types.class);
             for (int i = 0; i < HeightMap.TYPES.length; i++) {
                 long[] data = new long[SIZE];

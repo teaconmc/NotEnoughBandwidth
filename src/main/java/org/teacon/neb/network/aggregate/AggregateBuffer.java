@@ -1,6 +1,5 @@
 package org.teacon.neb.network.aggregate;
 
-import io.netty.channel.Channel;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import net.minecraft.network.Connection;
@@ -26,14 +25,9 @@ public final class AggregateBuffer {
 
     private static final AttributeKey<AggregateBuffer> BUFFER = AttributeKey.valueOf(NotEnoughBandwidth.id("buffer").toString());
 
-    @Nullable
     private static Attribute<AggregateBuffer> accessAB(Connection connection) {
-        @Nullable
-        Channel channel = connection.channel();
-        if (channel == null) { // DO NOT EDIT: For unknown reason, channel is nullable.
-            return null;
-        }
-        return channel.attr(BUFFER);
+        // FIXME: Reading non-volatile net.minecraft.network.Connection#channel may get unexpected NULL value.
+        return connection.channel().attr(BUFFER);
     }
 
     public static void initialize(Connection connection) {
@@ -44,19 +38,15 @@ public final class AggregateBuffer {
     }
 
     public static void release(Connection connection) {
-        Attribute<AggregateBuffer> holder = accessAB(connection);
-        if (holder != null) {
-            AggregateBuffer current = holder.getAndSet(null);
-            if (current != null) {
-                current.flush();
-            }
+        AggregateBuffer current = accessAB(connection).getAndSet(null);
+        if (current != null) {
+            current.flush();
         }
     }
 
     @Nullable
     public static AggregateBuffer get(Connection connection) {
-        Attribute<AggregateBuffer> buffer = accessAB(connection);
-        return buffer != null ? buffer.get() : null;
+        return accessAB(connection).get();
     }
 
     public void push(Packet<?> packet) {
