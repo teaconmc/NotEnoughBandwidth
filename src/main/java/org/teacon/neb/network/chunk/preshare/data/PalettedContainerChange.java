@@ -7,7 +7,6 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.util.BitStorage;
 import net.minecraft.world.level.chunk.Configuration;
 import net.minecraft.world.level.chunk.Palette;
-import net.minecraft.world.level.chunk.PaletteResize;
 import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.chunk.PalettedContainerRO;
 import net.minecraft.world.level.chunk.Strategy;
@@ -20,15 +19,19 @@ import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
 import java.util.concurrent.locks.Lock;
 
-// FIXME: Code cleanup
-public record PalettedContainerChange(byte bitsInMemory, byte bitsInStorage, byte[] palette, long[] data) {
-    public static final StreamCodec<@NotNull FriendlyByteBuf, @NotNull PalettedContainerChange> STREAM_CODEC = StreamCodec.composite(
+public record PalettedContainerChange<T>(byte bitsInMemory, byte bitsInStorage, byte[] palette, long[] data) {
+    private static final StreamCodec<@NotNull FriendlyByteBuf, @NotNull PalettedContainerChange<?>> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.BYTE, PalettedContainerChange::bitsInMemory,
             ByteBufCodecs.BYTE, PalettedContainerChange::bitsInStorage,
             ByteBufCodecs.BYTE_ARRAY, PalettedContainerChange::palette,
             ByteBufCodecs.LONG_ARRAY, PalettedContainerChange::data,
             PalettedContainerChange::new
     );
+
+    @SuppressWarnings("unchecked")
+    public static <T> StreamCodec<@NotNull FriendlyByteBuf, @NotNull PalettedContainerChange<T>> getCodec() {
+        return (StreamCodec<@NotNull FriendlyByteBuf, @NotNull PalettedContainerChange<T>>) (Object) STREAM_CODEC;
+    }
 
     private static final MethodHandle RESIZE;
     private static final VarHandle DATA, STRATEGY, CONFIGURATION, BIT_STORAGE, PALETTE;
@@ -55,12 +58,27 @@ public record PalettedContainerChange(byte bitsInMemory, byte bitsInStorage, byt
         return (Configuration) CONFIGURATION.get(DATA.get(instance));
     }
 
+    @SuppressWarnings("unchecked")
+    private static <T> Strategy<@NotNull T> getStrategy(PalettedContainer<@NotNull T> instance) {
+        return (Strategy<@NotNull T>) STRATEGY.get(instance);
+    }
+
     private static BitStorage getBitStorage(PalettedContainer<?> instance) {
         return (BitStorage) BIT_STORAGE.get(DATA.get(instance));
     }
 
-    private static Palette<?> getPalette(PalettedContainer<?> instance) {
-        return (Palette<?>) PALETTE.get(DATA.get(instance));
+    private static BitStorage getBitStorage(Object data) {
+        return (BitStorage) BIT_STORAGE.get(data);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> Palette<@NotNull T> getPalette(PalettedContainer<@NotNull T> instance) {
+        return (Palette<@NotNull T>) PALETTE.get(DATA.get(instance));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> Palette<@NotNull T> getPalette(Object data) {
+        return (Palette<@NotNull T>) PALETTE.get(data);
     }
 
     private static final NullPointerException NPE = new NullPointerException("INTERNAL IMPLEMENTATION");
@@ -70,20 +88,17 @@ public record PalettedContainerChange(byte bitsInMemory, byte bitsInStorage, byt
             Object originalData = DATA.get(instance);
             Object resizedData = RESIZE.invokeExact(instance, originalData, bits);
 
-            @SuppressWarnings("unchecked")
-            Palette<@NotNull T> currenpalette = (Palette<@NotNull T>) PALETTE.get(resizedData), oldPalette = (Palette<@NotNull T>) PALETTE.get(originalData);
-            BitStorage currentStorage = (BitStorage) BIT_STORAGE.get(resizedData), oldStorage = (BitStorage) BIT_STORAGE.get(originalData);
-
-            PaletteResize<@NotNull T> dummyResizer = (_, _) -> {
-                throw NPE;
-            };
+            Palette<@NotNull T> currenpalette = getPalette(resizedData), oldPalette = getPalette(originalData);
+            BitStorage currentStorage = getBitStorage(resizedData), oldStorage = getBitStorage(originalData);
 
             for (int i = 0; i < oldStorage.getSize(); i++) {
                 T value = oldPalette.valueFor(oldStorage.get(i));
 
                 int id = 0;
                 try {
-                    id =  currenpalette.idFor(value, dummyResizer);
+                    id = currenpalette.idFor(value, (_, _) -> {
+                        throw NPE;
+                    });
                 } catch (NullPointerException e) {
                     if (e != NPE) {
                         throw e;
@@ -98,11 +113,11 @@ public record PalettedContainerChange(byte bitsInMemory, byte bitsInStorage, byt
         }
     }
 
-    public static <T> PalettedContainerChange from(Lock lock, PalettedContainerRO<@NotNull T> base, PalettedContainerRO<@NotNull T> current) {
+    public static <T> PalettedContainerChange<T> from(Lock lock, PalettedContainerRO<@NotNull T> base, PalettedContainerRO<@NotNull T> current) {
         return from(lock, (PalettedContainer<@NotNull T>) base, (PalettedContainer<@NotNull T>) current);
     }
 
-    public static <T> PalettedContainerChange from(Lock lock, PalettedContainer<@NotNull T> base, PalettedContainer<@NotNull T> current) {
+    public static <T> PalettedContainerChange<T> from(Lock lock, PalettedContainer<@NotNull T> base, PalettedContainer<@NotNull T> current) {
         lock.lock();
         try {
             Configuration baseConfiguration = getConfiguration(base), currentConfiguration = getConfiguration(current);
@@ -119,11 +134,7 @@ public record PalettedContainerChange(byte bitsInMemory, byte bitsInStorage, byt
             byte[] paletteData;
             FriendlyByteBuf paletteBuffer = new FriendlyByteBuf(Unpooled.directBuffer());
             try {
-                @SuppressWarnings("unchecked")
-                Strategy<@NotNull T> strategy = (Strategy<@NotNull T>) STRATEGY.get(current);
-                @SuppressWarnings("unchecked")
-                Palette<@NotNull T> palette = (Palette<@NotNull T>) getPalette(current);
-                palette.write(paletteBuffer, strategy.globalMap());
+                getPalette(current).write(paletteBuffer, getStrategy(current).globalMap());
 
                 paletteData = new byte[paletteBuffer.readableBytes()];
                 paletteBuffer.readBytes(paletteData);
@@ -134,17 +145,17 @@ public record PalettedContainerChange(byte bitsInMemory, byte bitsInStorage, byt
             long[] arrayBase = baseStorage.getRaw(), arrayCurrent = currentStorage.getRaw();
             long[] result = new long[arrayBase.length];
             VectorSupport.xor(arrayBase, 0, arrayCurrent, 0, result, 0, arrayBase.length);
-            return new PalettedContainerChange((byte) baseConfiguration.bitsInMemory(), (byte) baseConfiguration.bitsInStorage(), paletteData, result);
+            return new PalettedContainerChange<>((byte) baseConfiguration.bitsInMemory(), (byte) baseConfiguration.bitsInStorage(), paletteData, result);
         } finally {
             lock.unlock();
         }
     }
 
-    public <T> PalettedContainer<@NotNull T> apply(Lock lock, PalettedContainerRO<@NotNull T> base) {
+    public PalettedContainer<@NotNull T> apply(Lock lock, PalettedContainerRO<@NotNull T> base) {
         return apply(lock, (PalettedContainer<@NotNull T>) base);
     }
 
-    public <T> PalettedContainer<@NotNull T> apply(Lock lock, PalettedContainer<@NotNull T> base) {
+    public PalettedContainer<@NotNull T> apply(Lock lock, PalettedContainer<@NotNull T> base) {
         lock.lock();
         try {
             Configuration baseConfiguration = getConfiguration(base);
@@ -158,12 +169,7 @@ public record PalettedContainerChange(byte bitsInMemory, byte bitsInStorage, byt
                 throw new AssertionError("Failed to resize PalettedContainer");
             }
 
-            @SuppressWarnings("unchecked")
-            Strategy<@NotNull T> strategy = (Strategy<@NotNull T>) STRATEGY.get(current);
-            @SuppressWarnings("unchecked")
-            Palette<@NotNull T> palette = (Palette<@NotNull T>) getPalette(current);
-            palette.read(new FriendlyByteBuf(Unpooled.wrappedBuffer(this.palette)), strategy.globalMap());
-
+            getPalette(current).read(new FriendlyByteBuf(Unpooled.wrappedBuffer(this.palette)), getStrategy(current).globalMap());
             VectorSupport.xor(baseStorage.getRaw(), 0, this.data, 0, currentStorage.getRaw(), 0, currentStorage.getRaw().length);
             return current;
         } finally {

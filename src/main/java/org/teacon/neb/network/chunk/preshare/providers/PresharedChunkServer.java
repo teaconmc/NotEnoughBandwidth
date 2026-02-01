@@ -38,16 +38,12 @@ public class PresharedChunkServer {
     }
 
     public static void load(MinecraftServer server) throws IOException {
-        lookup = PresharedChunkBundle.load(getBundlePath(server), server.registryAccess());
+        lookup = PresharedChunkBundle.load(server.getWorldPath(new LevelResource("preshared-chunks.neb")), server.registryAccess());
     }
 
     @SubscribeEvent
     private static void on(ServerStoppingEvent event) {
         unload();
-    }
-
-    private static @NotNull Path getBundlePath(MinecraftServer server) {
-        return server.getWorldPath(new LevelResource("preshared-chunks.neb"));
     }
 
     @SubscribeEvent
@@ -72,7 +68,7 @@ public class PresharedChunkServer {
         });
     }
 
-    public static void create(MinecraftServer server) throws IOException {
+    public static void create(MinecraftServer server, Path path) throws IOException {
         List<PresharedChunk> chunks = new ArrayList<>();
         ServerLevel level = Objects.requireNonNull(server.getLevel(Level.OVERWORLD));
         new ChunkTrackingView.Positioned(ChunkPos.ZERO, server.getPlayerList().getViewDistance()).forEach(pos -> {
@@ -81,7 +77,7 @@ public class PresharedChunkServer {
             chunks.add(presharedChunk);
         });
 
-        new PresharedChunkBundle(chunks).write(getBundlePath(server), server.registryAccess());
+        new PresharedChunkBundle(chunks).write(path, server.registryAccess());
     }
 
     public static void unload() {

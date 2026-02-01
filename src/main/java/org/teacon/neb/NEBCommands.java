@@ -1,6 +1,7 @@
 package org.teacon.neb;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSource;
@@ -18,6 +19,7 @@ import net.minecraft.util.Util;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -124,23 +126,38 @@ public class NEBCommands {
         event.getDispatcher().register(
                 Commands.literal("neb")
                         .then(Commands.literal("preshared")
-                                .requires(NEBCommands::checkAdministrator)
-                                .then(Commands.literal("create").executes(context -> {
-                                    MinecraftServer server = context.getSource().getServer();
-                                    server.getPlayerList().broadcastSystemMessage(Component.translatable("neb.preshared.create.working"), true);
-
-                                    try {
-                                        PresharedChunkServer.create(server);
-                                    } catch (Throwable e) {
-                                        NotEnoughBandwidth.LOGGER.warn("Cannot create preshared-chunk data.", e);
-                                        context.getSource().sendSystemMessage(Component.translatable("neb.preshared.create.failed"));
-                                        return -1;
+                                .requires(source -> {
+                                    if (source.source instanceof MinecraftServer) {
+                                        return true;
                                     }
-                                    context.getSource().sendSystemMessage(Component.translatable("neb.preshared.create.success"));
+                                    if (!FMLEnvironment.isProduction()) {
+                                        ServerPlayer player = PlayerCommandSourceAccessor.from(source.source);
+                                        if (player != null) {
+                                            return source.getServer().isSingleplayerOwner(player.nameAndId());
+                                        }
+                                    }
+                                    return false;
+                                })
+                                .then(Commands.literal("create")
+                                        .then(Commands.argument("path", StringArgumentType.greedyString())
+                                                .executes(context -> {
+                                                    MinecraftServer server = context.getSource().getServer();
+                                                    server.getPlayerList().broadcastSystemMessage(Component.translatable("neb.preshared.create.working"), true);
 
-                                    return Command.SINGLE_SUCCESS;
-                                }))
-                                .then(Commands.literal("load").executes(context -> {
+                                                    try {
+                                                        PresharedChunkServer.create(server, Path.of(context.getArgument("path", String.class)));
+                                                    } catch (Throwable e) {
+                                                        NotEnoughBandwidth.LOGGER.warn("Cannot create preshared-chunk data.", e);
+                                                        context.getSource().sendSystemMessage(Component.translatable("neb.preshared.create.failed"));
+                                                        return -1;
+                                                    }
+                                                    context.getSource().sendSystemMessage(Component.translatable("neb.preshared.create.success"));
+
+                                                    return Command.SINGLE_SUCCESS;
+                                                })
+                                        )
+                                )
+                                .then(Commands.literal("reload").executes(context -> {
                                     MinecraftServer server = context.getSource().getServer();
 
                                     for (ServerPlayer player : server.getPlayerList().getPlayers()) {

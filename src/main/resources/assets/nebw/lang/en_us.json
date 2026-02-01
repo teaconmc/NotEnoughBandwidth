@@ -1,13 +1,13 @@
 {
   "neb.profiler.client.start": "Client-side network profiler started.",
-  "neb.profiler.client.stop": "Client-side network profiler stopped, saving results ...",
+  "neb.profiler.client.stop": "Client-side network profiler stopped. Saving results...",
   "neb.profiler.server.start": "Server-side network profiler started.",
-  "neb.profiler.server.stop": "Server-side network profiler stopped, saving results ...",
-  "neb.profiler.result": "Profiler has been saved to %1$s",
+  "neb.profiler.server.stop": "Server-side network profiler stopped. Saving results...",
+  "neb.profiler.result": "Profiler results saved to %1$s",
 
-  "neb.preshared.create.working": "Creating Preshared Chunk Bundle. You may experience world frozen for a while ...",
-  "neb.preshared.create.failed": "Cannot create Preshared Chunk Bundle. See logs for more information.",
-  "neb.preshared.create.success": "Preshared Chunk Bundle creation succeed. Use '/neb preshared load' to perform a hotswap.",
-  "neb.preshared.create.connect_again": "The server administrator performs a Preshared Chunk Bundle hotswap. Please connect again.",
+  "neb.preshared.create.working": "Creating Preshared Chunk Bundle. The world may freeze briefly...",
+  "neb.preshared.create.failed": "Failed to create Preshared Chunk Bundle. Check the logs for details.",
+  "neb.preshared.create.success": "Preshared Chunk Bundle created successfully. Use '/neb preshared reload' to hot-swap it.",
+  "neb.preshared.create.connect_again": "The server administrator has hot-swapped the Preshared Chunk Bundle. Please reconnect.",
   "neb.preshared.version_mismatch": "Invalid Preshared Chunk Bundle. Remote version: %1$s, Local version: %2$s"
 }

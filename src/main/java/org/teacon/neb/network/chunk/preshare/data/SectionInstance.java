@@ -1,8 +1,11 @@
 package org.teacon.neb.network.chunk.preshare.data;
 
 import io.netty.buffer.Unpooled;
+import net.minecraft.core.Holder;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import org.jetbrains.annotations.NotNull;
@@ -43,12 +46,12 @@ public record SectionInstance(
     }
 
     public record Diff(
-            PalettedContainerChange states,
-            PalettedContainerChange biomes
+            PalettedContainerChange<BlockState> states,
+            PalettedContainerChange<Holder<@NotNull Biome>> biomes
     ) {
         public static final StreamCodec<@NotNull FriendlyByteBuf, @NotNull Diff> STREAM_CODEC = StreamCodec.composite(
-                PalettedContainerChange.STREAM_CODEC, Diff::states,
-                PalettedContainerChange.STREAM_CODEC, Diff::biomes,
+                PalettedContainerChange.getCodec(), Diff::states,
+                PalettedContainerChange.getCodec(), Diff::biomes,
                 Diff::new
         );
 
