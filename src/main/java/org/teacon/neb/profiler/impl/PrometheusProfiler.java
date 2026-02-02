@@ -1,16 +1,18 @@
 package org.teacon.neb.profiler.impl;
 
+import com.mojang.logging.LogUtils;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.exporter.HTTPServer;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
-import org.teacon.neb.NotEnoughBandwidth;
+import org.slf4j.Logger;
 import org.teacon.neb.profiler.ProfilerChannel;
 import org.teacon.neb.profiler.Snapshot;
 
 import java.io.IOException;
 
 public final class PrometheusProfiler implements ProfilerChannel.IProfiler {
+    private static final Logger LOGGER = LogUtils.getLogger();
     private final Counter TRANSMIT = Counter.build("neb_sent_total", "Total size of sent packets.").labelNames("id").register();
     private final Counter TRANSMIT_COMPRESSED = Counter.build("neb_sent_compressed_bytes_total", "Total size (compressed) of sent packets.").register();
     private final Counter RECEIVE = Counter.build("neb_received_total", "Total size of received packets.").labelNames("id").register();
@@ -28,7 +30,7 @@ public final class PrometheusProfiler implements ProfilerChannel.IProfiler {
             throw new IllegalStateException(e);
         }
 
-        NotEnoughBandwidth.LOGGER.info("Prometheus dashboard has started on port: {}", port);
+        LOGGER.info("Prometheus dashboard has started on port: {}", port);
     }
 
     @Override

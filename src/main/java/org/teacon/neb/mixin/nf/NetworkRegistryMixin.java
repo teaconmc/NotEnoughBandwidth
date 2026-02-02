@@ -19,7 +19,7 @@ import java.util.Map;
 public class NetworkRegistryMixin {
     @Shadow
     @Final
-    private static Map<ConnectionProtocol, Map<Identifier, PayloadRegistration<?>>> PAYLOAD_REGISTRATIONS;
+    protected static Map<ConnectionProtocol, Map<Identifier, PayloadRegistration<?>>> PAYLOAD_REGISTRATIONS;
 
     @Inject(method = "setup", at = @At("TAIL"))
     private static void onSetup(CallbackInfo ci) {

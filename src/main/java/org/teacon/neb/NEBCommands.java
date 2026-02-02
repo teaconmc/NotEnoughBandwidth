@@ -3,6 +3,7 @@ package org.teacon.neb;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
@@ -32,6 +33,7 @@ import net.neoforged.neoforge.server.permission.nodes.PermissionNode;
 import net.neoforged.neoforge.server.permission.nodes.PermissionTypes;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 import org.teacon.neb.network.chunk.preshare.providers.PresharedChunkServer;
 import org.teacon.neb.profiler.ProfilerChannel;
 import org.teacon.neb.profiler.impl.SimpleProfiler;
@@ -51,6 +53,8 @@ import java.util.List;
 public class NEBCommands {
     private NEBCommands() {
     }
+
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final class PlayerCommandSourceAccessor {
         private PlayerCommandSourceAccessor() {
@@ -147,7 +151,7 @@ public class NEBCommands {
                                                     try {
                                                         PresharedChunkServer.create(server, Path.of(context.getArgument("path", String.class)));
                                                     } catch (Throwable e) {
-                                                        NotEnoughBandwidth.LOGGER.warn("Cannot create preshared-chunk data.", e);
+                                                        LOGGER.warn("Cannot create preshared-chunk data.", e);
                                                         context.getSource().sendSystemMessage(Component.translatable("neb.preshared.create.failed"));
                                                         return -1;
                                                     }
@@ -166,7 +170,7 @@ public class NEBCommands {
                                     try {
                                         PresharedChunkServer.load(server);
                                     } catch (IOException e) {
-                                        NotEnoughBandwidth.LOGGER.warn("Cannot load preshared-chunk data.", e);
+                                        LOGGER.warn("Cannot load preshared-chunk data.", e);
                                         return -2;
                                     }
 
@@ -220,7 +224,7 @@ public class NEBCommands {
                     Files.writeString(path, result, StandardCharsets.UTF_8);
                     context.getSource().sendSystemMessage(Component.translatable("neb.profiler.result", path.toString()));
                 } catch (IOException e) {
-                    NotEnoughBandwidth.LOGGER.warn("Cannot write profile result.", e);
+                    LOGGER.warn("Cannot write profile result.", e);
                 }
             } else {
                 ServerPlayer player = PlayerCommandSourceAccessor.from(context.getSource().source);
@@ -277,7 +281,7 @@ public class NEBCommands {
                         Minecraft.getInstance().getChatListener().handleSystemMessage(Component.translatable("neb.profiler.result", path.toString()), false);
                     });
                 } catch (IOException e) {
-                    NotEnoughBandwidth.LOGGER.warn("Cannot write profile result.", e);
+                    LOGGER.warn("Cannot write profile result.", e);
                 }
             });
         }

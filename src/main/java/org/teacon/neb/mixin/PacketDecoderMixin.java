@@ -23,7 +23,7 @@ public class PacketDecoderMixin {
                     ordinal = 1
             )
     )
-    private String transformPacketType(Object _0, @Local(ordinal = 0) Packet<?> packet) {
+    private String transformPacketType(Object _0, @Local(name = "packet") Packet<?> packet) {
         Identifier payloadType = switch (packet) {
             case VanillaCustomPayload payload -> payload.payload().type().id();
             case IndexPacket(PacketType<@NotNull IndexPacket> ignored, CustomPacketPayload payload) ->

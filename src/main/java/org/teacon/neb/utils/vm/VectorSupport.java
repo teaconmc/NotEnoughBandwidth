@@ -23,12 +23,13 @@
  */
 package org.teacon.neb.utils.vm;
 
+import com.mojang.logging.LogUtils;
 import jdk.incubator.vector.ByteVector;
 import jdk.incubator.vector.LongVector;
 import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorSpecies;
 import org.jetbrains.annotations.Nullable;
-import org.teacon.neb.NotEnoughBandwidth;
+import org.slf4j.Logger;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -77,6 +78,8 @@ public final class VectorSupport {
     private record Context(
             Class<?> fallback, @Nullable Class<?> vectorized
     ) {
+        private static final Logger LOGGER = LogUtils.getLogger();
+
         public static Context create() throws ReflectiveOperationException {
             Class<?> fallback = Class.forName(VectorSupport.class.getName() + "$Fallback");
 
@@ -94,9 +97,9 @@ public final class VectorSupport {
                 }
 
                 vectorized = Class.forName(VectorSupport.class.getName() + "$Vectorized");
-                NotEnoughBandwidth.LOGGER.warn("Using incubating Vector API to accelerate path calculation.");
+                LOGGER.warn("Using incubating Vector API to accelerate path calculation.");
             } catch (Throwable e) {
-                NotEnoughBandwidth.LOGGER.warn("Cannot accelerate patch calculation: No Vector API available.", e);
+                LOGGER.warn("Cannot accelerate patch calculation: No Vector API available.", e);
             }
 
             return new Context(fallback, vectorized);
