@@ -15,6 +15,7 @@ import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.network.event.RegisterConfigurationTasksEvent;
 import org.jetbrains.annotations.NotNull;
+import org.teacon.neb.NEBConfigs;
 import org.teacon.neb.NotEnoughBandwidth;
 import org.teacon.neb.network.chunk.preshare.PresharedChunk;
 import org.teacon.neb.network.chunk.preshare.PresharedChunkBundle;
@@ -71,7 +72,11 @@ public class PresharedChunkServer {
     public static void create(MinecraftServer server, Path path) throws IOException {
         List<PresharedChunk> chunks = new ArrayList<>();
         ServerLevel level = Objects.requireNonNull(server.getLevel(Level.OVERWORLD));
-        new ChunkTrackingView.Positioned(ChunkPos.ZERO, server.getPlayerList().getViewDistance()).forEach(pos -> {
+
+        new ChunkTrackingView.Positioned(
+                ChunkPos.containing(level.getRespawnData().pos()),
+                server.getPlayerList().getViewDistance() + NEBConfigs.PRESHARED_CHUNK_DISTANCE.get()
+        ).forEach(pos -> {
             LevelChunk chunk = level.getChunk(pos.x(), pos.z());
             PresharedChunk presharedChunk = PresharedChunk.createCache(chunk);
             chunks.add(presharedChunk);

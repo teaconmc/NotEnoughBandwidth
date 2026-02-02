@@ -12,6 +12,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.PermissionLevel;
@@ -146,7 +147,15 @@ public class NEBCommands {
                                         .then(Commands.argument("path", StringArgumentType.greedyString())
                                                 .executes(context -> {
                                                     MinecraftServer server = context.getSource().getServer();
-                                                    server.getPlayerList().broadcastSystemMessage(Component.translatable("neb.preshared.create.working"), true);
+
+                                                    Component message = Component.translatable("neb.preshared.create.working");
+                                                    server.sendSystemMessage(message);
+                                                    for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                                                        player.connection.getConnection().send(
+                                                                new ClientboundSystemChatPacket(message, true),
+                                                                _ -> {}, true
+                                                        );
+                                                    }
 
                                                     try {
                                                         PresharedChunkServer.create(server, Path.of(context.getArgument("path", String.class)));
@@ -161,25 +170,8 @@ public class NEBCommands {
                                                 })
                                         )
                                 )
-                                .then(Commands.literal("reload").executes(context -> {
-                                    MinecraftServer server = context.getSource().getServer();
-
-                                    for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-                                        player.connection.disconnect(Component.translatable("neb.preshared.create.connect_again"));
-                                    }
-                                    try {
-                                        PresharedChunkServer.load(server);
-                                    } catch (IOException e) {
-                                        LOGGER.warn("Cannot load preshared-chunk data.", e);
-                                        return -2;
-                                    }
-
-                                    return Command.SINGLE_SUCCESS;
-                                }))
-                                .then(Commands.literal("unload").executes(context -> {
-                                    PresharedChunkServer.unload();
-                                    return Command.SINGLE_SUCCESS;
-                                }))
+                                .then(Commands.literal("reload").executes(context -> onReloadPresharedChunks(context, true)))
+                                .then(Commands.literal("unload").executes(context -> onReloadPresharedChunks(context, false)))
                         )
                         .then(Commands.literal("profiler")
                                 .requires(NEBCommands::checkAdministrator)
@@ -194,6 +186,29 @@ public class NEBCommands {
                                 }))
                         )
         );
+    }
+
+    private static int onReloadPresharedChunks(CommandContext<CommandSourceStack> context, boolean load) {
+        MinecraftServer server = context.getSource().getServer();
+
+        List<ServerPlayer> players = server.getPlayerList().getPlayers();
+        for (int i = players.size() - 1; i >= 0; i--) {
+            players.get(i).connection.disconnect(Component.translatable("neb.preshared.create.connect_again"));
+        }
+
+        try {
+            if (load) {
+                PresharedChunkServer.load(server);
+            } else {
+                PresharedChunkServer.unload();
+            }
+        } catch (IOException e) {
+            LOGGER.warn("Cannot load preshared-chunk data.", e);
+            return -2;
+        }
+
+        server.sendSystemMessage(Component.translatable("neb.preshared.create.connect_again"));
+        return Command.SINGLE_SUCCESS;
     }
 
     private record SimpleProfileResult(String body) implements CustomPacketPayload {

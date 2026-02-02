@@ -23,7 +23,7 @@ public record PresharedChunkPacket(
         ChunkPos pos,
         HeightMap.Diff heightmaps,
         List<SectionInstance.Diff> sections,
-        List<LevelLightSection> lights,
+        List<LevelLightSection.Diff> lights,
         List<BlockEntityInfo.Diff> blockEntities
 ) implements CustomPacketPayload {
     public static final Type<@NotNull PresharedChunkPacket> TYPE = new Type<>(NotEnoughBandwidth.id("s2c/preshared_chunk"));
@@ -32,7 +32,7 @@ public record PresharedChunkPacket(
             ChunkPos.STREAM_CODEC, PresharedChunkPacket::pos,
             HeightMap.Diff.STREAM_CODEC, PresharedChunkPacket::heightmaps,
             SectionInstance.Diff.STREAM_CODEC.apply(ByteBufCodecs.list()), PresharedChunkPacket::sections,
-            LevelLightSection.STREAM_CODEC.apply(ByteBufCodecs.list()), PresharedChunkPacket::lights,
+            LevelLightSection.Diff.STREAM_CODEC.apply(ByteBufCodecs.list()), PresharedChunkPacket::lights,
             BlockEntityInfo.Diff.STREAM_CODEC.apply(ByteBufCodecs.list()), PresharedChunkPacket::blockEntities,
             PresharedChunkPacket::new
     );

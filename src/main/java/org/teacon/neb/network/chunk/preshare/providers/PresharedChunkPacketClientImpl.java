@@ -118,7 +118,7 @@ public class PresharedChunkPacketClientImpl {
         }
     }
 
-    private static ClientboundLightUpdatePacketData applyLight(PresharedChunkPacket packet) {
+    private static ClientboundLightUpdatePacketData applyLight(PresharedChunkPacket packet, PresharedChunk base) {
         BitSet skyYMask = new BitSet();
         BitSet blockYMask = new BitSet();
         BitSet emptySkyYMask = new BitSet();
@@ -127,9 +127,10 @@ public class PresharedChunkPacketClientImpl {
         List<byte[]> blockUpdates = new ArrayList<>();
 
         for (int i = 0; i < packet.lights().size(); i++) {
-            LevelLightSection light = packet.lights().get(i);
-            applyLightType(light.block(), i, blockYMask, emptyBlockYMask, blockUpdates);
-            applyLightType(light.sky(), i, skyYMask, emptySkyYMask, skyUpdates);
+            LevelLightSection lightBase = base.lights().get(i);
+            LevelLightSection.Diff lightDiff = packet.lights().get(i);
+            applyLightType(lightDiff.block(), lightBase.block(), i, blockYMask, emptyBlockYMask, blockUpdates);
+            applyLightType(lightDiff.sky(), lightBase.sky(), i, skyYMask, emptySkyYMask, skyUpdates);
         }
 
         try {
@@ -139,7 +140,10 @@ public class PresharedChunkPacketClientImpl {
         }
     }
 
-    private static void applyLightType(byte[] lights, int sectionIndex, BitSet yMask, BitSet emptyYMask, List<byte[]> updates) {
+    private static void applyLightType(byte[] diff, byte[] base, int sectionIndex, BitSet yMask, BitSet emptyYMask, List<byte[]> updates) {
+        byte[] lights = new byte[2048];
+        VectorSupport.xor(diff, 0, base, 0, lights, 0, 2048);
+
         if (VectorSupport.isEmpty(lights)) {
             emptyYMask.set(sectionIndex);
         } else {
@@ -151,7 +155,7 @@ public class PresharedChunkPacketClientImpl {
     private static ClientboundLevelChunkWithLightPacket apply(PresharedChunkPacket packet, PresharedChunk base) {
         ChunkPos pos = base.pos();
         ClientboundLevelChunkPacketData chunk = applyChunk(packet, base);
-        ClientboundLightUpdatePacketData light = applyLight(packet);
+        ClientboundLightUpdatePacketData light = applyLight(packet, base);
 
         try {
             return (ClientboundLevelChunkWithLightPacket) CLCWLP_NEW.invokeExact(pos.x(), pos.z(), chunk, light);

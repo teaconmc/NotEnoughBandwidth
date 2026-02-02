@@ -42,13 +42,14 @@ public final class VectorSupport {
     private VectorSupport() {
     }
 
-    private static final MethodHandle XOR_J, NON_EMPTY_B;
+    private static final MethodHandle XOR_J, XOR_Z, NON_EMPTY_B;
 
     static {
         try {
             Context context = Context.create();
 
             XOR_J = context.resolve("xor", MethodType.methodType(void.class, long[].class, int.class, long[].class, int.class, long[].class, int.class, int.class));
+            XOR_Z = context.resolve("xor", MethodType.methodType(void.class, byte[].class, int.class, byte[].class, int.class, byte[].class, int.class, int.class));
             NON_EMPTY_B = context.resolve("isEmpty", MethodType.methodType(boolean.class, byte[].class));
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
@@ -62,6 +63,18 @@ public final class VectorSupport {
 
         try {
             XOR_J.invokeExact(array1, index1, array2, index2, out, index3, length);
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static void xor(byte[] array1, int index1, byte[] array2, int index2, byte[] out, int index3, int length) {
+        Objects.checkFromIndexSize(index1, length, array1.length);
+        Objects.checkFromIndexSize(index2, length, array2.length);
+        Objects.checkFromIndexSize(index3, length, out.length);
+
+        try {
+            XOR_Z.invokeExact(array1, index1, array2, index2, out, index3, length);
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
@@ -135,6 +148,18 @@ public final class VectorSupport {
 
         private static final VectorSpecies<Byte> BYTE_SPECIES = ByteVector.SPECIES_PREFERRED;
 
+        public static void xor(byte[] array1, int index1, byte[] array2, int index2, byte[] out, int index3, int length) {
+            int i = 0;
+            for (int bound = BYTE_SPECIES.loopBound(length); i < bound; i += BYTE_SPECIES.length()) {
+                ByteVector a = ByteVector.fromArray(BYTE_SPECIES, array1, index1 + i);
+                ByteVector b = ByteVector.fromArray(BYTE_SPECIES, array2, index2 + i);
+                a.lanewise(VectorOperators.XOR, b).intoArray(out, index3 + i);
+            }
+            for (; i < length; i++) {
+                out[index3 + i] = (byte) (array1[index1 + i] ^ array2[index2 + i]);
+            }
+        }
+
         public static boolean isEmpty(byte[] value) {
             int i = 0;
             for (int bound = BYTE_SPECIES.loopBound(value.length); i < bound; i += BYTE_SPECIES.length()) {
@@ -160,6 +185,22 @@ public final class VectorSupport {
         }
 
         private static final VarHandle B_J = MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.nativeOrder());
+
+        public static void xor(byte[] array1, int index1, byte[] array2, int index2, byte[] out, int index3, int length) {
+            int i = 0;
+            if ((index1 & 7) == 0 && (index2 & 7) == 0 && (index3 & 7) == 0) {
+                // Fast path for aligned access.
+                for (int bound = length & 7; i < bound; i++) {
+                    long v1 = (long) B_J.get(array1, index1 + i);
+                    long v2 = (long) B_J.get(array2, index2 + i);
+
+                    B_J.set(out, index3 + i, v1 ^ v2);
+                }
+            }
+            for (; i < length; i++) {
+                out[index3 + i] = (byte) (array1[index1 + i] ^ array2[index2 + i]);
+            }
+        }
 
         public static boolean isEmpty(byte[] value) {
             int i = 0;

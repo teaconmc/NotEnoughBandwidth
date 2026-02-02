@@ -31,6 +31,9 @@ public final class NEBConfigs {
     public static ModConfigSpec.ConfigValue<@NotNull Integer> CHUNK_CACHE_DISTANCE;
     public static ModConfigSpec.ConfigValue<@NotNull Integer> CHUNK_CACHE_TIMEOUT;
 
+    public static ModConfigSpec.ConfigValue<@NotNull Integer> PRESHARED_CHUNK_DISTANCE;
+    public static ModConfigSpec.ConfigValue<@NotNull Integer> PRESHARED_CHUNK_COMPRESS_LEVEL;
+
     private static ModConfigSpec.ConfigValue<@NotNull List<? extends String>> PACKET_BLACKLIST;
 
     @SubscribeEvent
@@ -68,6 +71,24 @@ public final class NEBConfigs {
                         """))
                 .defineInRange("timeout", 60, 0, Integer.MAX_VALUE);
         builder.pop();
+
+        builder.comment(formatComments("""
+                        Preshared Chunk Bundle is an archive that contains a pre-generated, preshared set of chunks near the world spawn point.
+                        This bundle is highly compressed and should be distributed via external sources (e.g. CDN).
+                        When syncing chunks inside this bundle, the server sends a small diff instead of full data,
+                        reducing network bandwidth usage.
+                        """))
+                .push("preshared_chunk_bundle");
+        PRESHARED_CHUNK_DISTANCE = builder
+                .comment(formatComments("""
+                        Distance threshold in chunks.
+                        Chunks within (view distance + this value) from the player
+                        will be included in the Preshared Chunk Bundle.
+                        """))
+                .defineInRange("distance", 5, 0, Integer.MAX_VALUE);
+        PRESHARED_CHUNK_COMPRESS_LEVEL = builder
+                .comment(formatComments("ZSTD compression level for the Preshared Chunk Bundle."))
+                .defineInRange("compress_level", 22, 0, Integer.MAX_VALUE);
 
         PACKET_BLACKLIST = builder.defineList(
                 "packet_blacklist", ArrayList::new, () -> "",

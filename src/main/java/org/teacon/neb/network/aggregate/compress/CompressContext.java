@@ -64,7 +64,7 @@ public final class CompressContext {
 
     public static CompressContext ofPresharedChunk() {
         ZstdCompressCtx compress = new ZstdCompressCtx()
-                .setLevel(22)
+                .setLevel(NEBConfigs.PRESHARED_CHUNK_COMPRESS_LEVEL.get())
                 .setChecksum(true);
         ZstdDecompressCtx decompress = new ZstdDecompressCtx();
 

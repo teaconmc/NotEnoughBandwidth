@@ -10,6 +10,8 @@ import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.lighting.LevelLightEngine;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.teacon.neb.utils.vm.VectorSupport;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,18 +34,18 @@ public record LevelLightSection(
         for (int i = 0; i < lightSectionCount; i++) {
             SectionPos sectionPos = SectionPos.of(pos, i + lightEngine.getMinLightSection());
             lights.add(new LevelLightSection(
-                    createDataLayer(lightEngine, sectionPos, LightLayer.BLOCK),
-                    createDataLayer(lightEngine, sectionPos, LightLayer.SKY)
+                    createDataLayer(lightEngine, sectionPos, LightLayer.BLOCK, true),
+                    createDataLayer(lightEngine, sectionPos, LightLayer.SKY, true)
             ));
         }
 
         return lights;
     }
 
-    private static byte[] createDataLayer(LevelLightEngine lightEngine, SectionPos pos, LightLayer type) {
+    private static byte[] createDataLayer(LevelLightEngine lightEngine, SectionPos pos, LightLayer type, boolean allocateNull) {
         DataLayer data = lightEngine.getLayerListener(type).getDataLayerData(pos);
         if (data == null) {
-            return new byte[2048];
+            return allocateNull ? new byte[2048] : null;
         }
 
         byte[] val = data.getData();
@@ -51,5 +53,48 @@ public record LevelLightSection(
             throw new AssertionError(String.format("LightLayer should be 2048 bytes, but found %d bytes.", val.length));
         }
         return val;
+    }
+
+    public record Diff(
+            byte[] block, byte[] sky
+    ) {
+        public static final StreamCodec<@NotNull FriendlyByteBuf, @NotNull Diff> STREAM_CODEC = StreamCodec.composite(
+                ByteBufCodecs.BYTE_ARRAY, Diff::block,
+                ByteBufCodecs.BYTE_ARRAY, Diff::sky,
+                Diff::new
+        );
+
+        public static List<Diff> from(List<LevelLightSection> bases, LevelChunk chunk) {
+            ChunkPos pos = chunk.getPos();
+            LevelLightEngine lightEngine = chunk.getLevel().getLightEngine();
+
+            int lightSectionCount = lightEngine.getLightSectionCount();
+            if (bases.size() != lightSectionCount) {
+                throw new AssertionError(String.format("Invalid base, expecting %d LevelLightSections, but found %d.", lightSectionCount, bases.size()));
+            }
+
+            List<Diff> lights = new ArrayList<>(lightSectionCount);
+            for (int i = 0; i < lightSectionCount; i++) {
+                SectionPos sectionPos = SectionPos.of(pos, i + lightEngine.getMinLightSection());
+                LevelLightSection base = bases.get(i);
+
+                lights.add(new Diff(
+                        diff(createDataLayer(lightEngine, sectionPos, LightLayer.BLOCK, false), base.block),
+                        diff(createDataLayer(lightEngine, sectionPos, LightLayer.SKY, false), base.sky)
+                ));
+            }
+
+            return lights;
+        }
+
+        private static byte[] diff(byte @Nullable [] left, byte[] right) {
+            if (left == null) {
+                return right.clone();
+            }
+
+            byte[] bytes = new byte[2048];
+            VectorSupport.xor(left, 0, right, 0, bytes, 0, 2048);
+            return bytes;
+        }
     }
 }
