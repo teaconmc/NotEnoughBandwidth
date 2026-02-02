@@ -148,23 +148,14 @@ public class NEBCommands {
                                                 .executes(context -> {
                                                     MinecraftServer server = context.getSource().getServer();
 
-                                                    Component message = Component.translatable("neb.preshared.create.working");
-                                                    server.sendSystemMessage(message);
-                                                    for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-                                                        player.connection.getConnection().send(
-                                                                new ClientboundSystemChatPacket(message, true),
-                                                                _ -> {}, true
-                                                        );
-                                                    }
-
-                                                    try {
-                                                        PresharedChunkServer.create(server, Path.of(context.getArgument("path", String.class)));
-                                                    } catch (Throwable e) {
-                                                        LOGGER.warn("Cannot create preshared-chunk data.", e);
-                                                        context.getSource().sendSystemMessage(Component.translatable("neb.preshared.create.failed"));
-                                                        return -1;
-                                                    }
-                                                    context.getSource().sendSystemMessage(Component.translatable("neb.preshared.create.success"));
+                                                    PresharedChunkServer.create(server, Path.of(context.getArgument("path", String.class)))
+                                                            .whenCompleteAsync((_, exception) -> {
+                                                                if (exception == null) {
+                                                                    context.getSource().sendSystemMessage(Component.translatable("neb.preshared.create.success"));
+                                                                } else {
+                                                                    context.getSource().sendSystemMessage(Component.translatable("neb.preshared.create.failed"));
+                                                                }
+                                                            }, server);
 
                                                     return Command.SINGLE_SUCCESS;
                                                 })
