@@ -13,7 +13,6 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
-import net.neoforged.neoforge.network.registration.HandlerThread;
 import org.teacon.neb.NotEnoughBandwidth;
 import org.teacon.neb.network.chunk.preshare.PresharedChunk;
 import org.teacon.neb.network.chunk.preshare.PresharedChunkGuardPacket;
@@ -77,7 +76,10 @@ public class PresharedChunkPacketClientImpl {
 
     @SubscribeEvent
     private static void on(RegisterClientPayloadHandlersEvent event) {
-        event.register(PresharedChunkPacket.TYPE, HandlerThread.NETWORK, (packet, listener) -> {
+        event.register(PresharedChunkPacket.TYPE, (packet, listener) -> {
+            // FIXME: listener.player() will read non-volatile field Minecraft#player, causing thread visibility
+            //        problems if this packet is handled on network threads. However, PresharedChunkPacket#apply
+            //        involves complex packet transform codes, which may cause performance issues.
             PresharedChunk preshared = PresharedChunkClient.lookup.getChunk(listener.player().level(), packet.pos());
             if (preshared == null) {
                 throw new IllegalStateException("Receiving unknown preshared-chunks.");

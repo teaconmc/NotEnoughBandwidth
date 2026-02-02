@@ -202,11 +202,7 @@ import java.lang.invoke.MethodHandles;
         }
     }
 
-    private static void callback(MethodHandles.Lookup lookup) throws Throwable {
-        lookup.findStaticSetter(
-                LookupAccessImpl.class,
-                "INSTANCE",
-                MethodHandles.Lookup.class
-        ).invokeExact(lookup);
+    private static void callback(MethodHandles.Lookup lookup) {
+        INSTANCE = lookup;
     }
 }
