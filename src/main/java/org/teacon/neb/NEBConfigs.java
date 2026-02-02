@@ -89,6 +89,7 @@ public final class NEBConfigs {
         PRESHARED_CHUNK_COMPRESS_LEVEL = builder
                 .comment(formatComments("ZSTD compression level for the Preshared Chunk Bundle."))
                 .defineInRange("compress_level", 22, 0, Integer.MAX_VALUE);
+        builder.pop();
 
         PACKET_BLACKLIST = builder.defineList(
                 "packet_blacklist", ArrayList::new, () -> "",
