@@ -6,6 +6,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkPacketData;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.network.protocol.game.ClientboundLightUpdatePacketData;
+import net.minecraft.util.profiling.Profiler;
+import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -85,7 +87,11 @@ public class PresharedChunkPacketClientImpl {
                 throw new IllegalStateException("Receiving unknown preshared-chunks.");
             }
 
+            ProfilerFiller profiler = Profiler.get();
+            profiler.push("regenerateVanillaLCWLP");
             ClientboundLevelChunkWithLightPacket pkt = apply(packet, preshared);
+            profiler.pop();
+
             listener.enqueueWork(() -> listener.handle(pkt));
         });
 

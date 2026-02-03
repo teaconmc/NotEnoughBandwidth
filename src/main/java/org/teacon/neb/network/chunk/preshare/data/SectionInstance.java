@@ -8,6 +8,7 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
+import org.teacon.neb.network.chunk.preshare.data.palette.PalettedContainerChange;
 import org.teacon.neb.utils.ContextByteBuf;
 
 import java.util.ArrayList;

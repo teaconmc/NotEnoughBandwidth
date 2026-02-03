@@ -6,6 +6,8 @@ import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.network.PlayerChunkSender;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.util.profiling.Profiler;
+import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.neoforge.common.world.LevelChunkAuxiliaryLightManager;
 import net.neoforged.neoforge.network.payload.AuxiliaryLightDataPayload;
@@ -50,10 +52,13 @@ public class PlayerChunkSenderMixin {
             @SuppressWarnings("unchecked")
             Map<BlockPos, Byte> lights = (Map<BlockPos, Byte>) NEOFORGE_LIGHTS.get(chunk.getAuxLightManager(chunk.getPos()));
 
+            ProfilerFiller profiler = Profiler.get();
+            profiler.push("createChunkDiff");
             connection.send(new ClientboundBundlePacket(List.of(
                     preshared.createDiff(chunk).toVanillaClientbound(),
                     new AuxiliaryLightDataPayload(chunk.getPos(), lights).toVanillaClientbound()
             )));
+            profiler.pop();
         }
 
         level.debugSynchronizers().startTrackingChunk(connection.player, chunk.getPos());
