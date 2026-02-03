@@ -12,7 +12,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.PermissionLevel;
@@ -32,7 +31,6 @@ import net.neoforged.neoforge.server.permission.PermissionAPI;
 import net.neoforged.neoforge.server.permission.events.PermissionGatherEvent;
 import net.neoforged.neoforge.server.permission.nodes.PermissionNode;
 import net.neoforged.neoforge.server.permission.nodes.PermissionTypes;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.teacon.neb.network.chunk.preshare.providers.PresharedChunkServer;
@@ -100,7 +98,7 @@ public class NEBCommands {
         }
     }
 
-    private static final PermissionNode<@NotNull Boolean> ADMIN_PERMISSION = new PermissionNode<>(
+    private static final PermissionNode<Boolean> ADMIN_PERMISSION = new PermissionNode<>(
             NotEnoughBandwidth.id("command.admin"), PermissionTypes.BOOLEAN,
             (player, uuid, context) -> {
                 MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
@@ -203,11 +201,10 @@ public class NEBCommands {
     }
 
     private record SimpleProfileResult(String body) implements CustomPacketPayload {
-        private static final Type<@NotNull SimpleProfileResult> TYPE = new Type<>(NotEnoughBandwidth.id("s2c/simple_profile_result"));
+        private static final Type<SimpleProfileResult> TYPE = new Type<>(NotEnoughBandwidth.id("s2c/simple_profile_result"));
 
         @Override
-        @NotNull
-        public Type<? extends @NotNull CustomPacketPayload> type() {
+        public Type<? extends CustomPacketPayload> type() {
             return TYPE;
         }
     }
@@ -277,7 +274,7 @@ public class NEBCommands {
             }
         }
 
-        public static void saveResult(@NotNull String result) {
+        public static void saveResult(String result) {
             Thread.startVirtualThread(() -> {
                 try {
                     Path path = Files.createTempFile("neb-", ".csv");

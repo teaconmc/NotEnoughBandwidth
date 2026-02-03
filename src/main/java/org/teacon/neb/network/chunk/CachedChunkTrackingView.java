@@ -50,7 +50,6 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
      * <p>All chunks contained in this view are considered visible regardless
      * of the cache state.</p>
      */
-    @NotNull
     private ChunkTrackingView.Positioned major;
 
     /**
@@ -68,7 +67,7 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
      */
     private final Long2LongLinkedOpenHashMap cache = new Long2LongLinkedOpenHashMap();
 
-    public CachedChunkTrackingView(@NotNull ChunkTrackingView.Positioned major) {
+    public CachedChunkTrackingView(ChunkTrackingView.Positioned major) {
         this.major = major;
         cache.defaultReturnValue(NO_CACHE);
     }

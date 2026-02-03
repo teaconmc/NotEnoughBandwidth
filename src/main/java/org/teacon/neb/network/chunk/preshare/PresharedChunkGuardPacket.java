@@ -17,16 +17,16 @@ import java.util.UUID;
 public record PresharedChunkGuardPacket(
         UUID version
 ) implements CustomPacketPayload {
-    public static final Type<@NotNull PresharedChunkGuardPacket> TYPE = new Type<>(NotEnoughBandwidth.id("s2c/preshared_chunk_guard"));
+    public static final Type<PresharedChunkGuardPacket> TYPE = new Type<>(NotEnoughBandwidth.id("s2c/preshared_chunk_guard"));
 
-    public static final StreamCodec<@NotNull FriendlyByteBuf, @NotNull PresharedChunkGuardPacket> STREAM_CODEC = StreamCodec.composite(
+    public static final StreamCodec<FriendlyByteBuf, PresharedChunkGuardPacket> STREAM_CODEC = StreamCodec.composite(
             UUIDUtil.STREAM_CODEC, PresharedChunkGuardPacket::version,
             PresharedChunkGuardPacket::new
     );
 
     @Override
     @NotNull
-    public Type<? extends @NotNull CustomPacketPayload> type() {
+    public Type<? extends CustomPacketPayload> type() {
         return TYPE;
     }
 

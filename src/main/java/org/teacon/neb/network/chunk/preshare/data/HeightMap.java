@@ -6,7 +6,6 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
-import org.jetbrains.annotations.NotNull;
 import org.teacon.neb.utils.ContextByteBuf;
 import org.teacon.neb.utils.vm.VectorSupport;
 
@@ -24,7 +23,7 @@ public record HeightMap(
 
     private static final int SIZE = 37;
 
-    public static final StreamCodec<@NotNull ContextByteBuf, @NotNull HeightMap> STREAM_CODEC = StreamCodec.composite(
+    public static final StreamCodec<ContextByteBuf, HeightMap> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.LONG_ARRAY, HeightMap::heightmap, HeightMap::new
     );
 
@@ -44,7 +43,7 @@ public record HeightMap(
     }
 
     public record Diff(long[] heightmap) {
-        public static final StreamCodec<@NotNull FriendlyByteBuf, @NotNull Diff> STREAM_CODEC = StreamCodec.composite(
+        public static final StreamCodec<FriendlyByteBuf, Diff> STREAM_CODEC = StreamCodec.composite(
                 ByteBufCodecs.LONG_ARRAY, Diff::heightmap, Diff::new
         );
 

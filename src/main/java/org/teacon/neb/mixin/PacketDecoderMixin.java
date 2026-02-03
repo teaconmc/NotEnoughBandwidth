@@ -6,7 +6,6 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketType;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
-import org.jetbrains.annotations.NotNull;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
@@ -26,12 +25,11 @@ public class PacketDecoderMixin {
     private String transformPacketType(Object _0, @Local(name = "packet") Packet<?> packet) {
         Identifier payloadType = switch (packet) {
             case VanillaCustomPayload payload -> payload.payload().type().id();
-            case IndexPacket(PacketType<@NotNull IndexPacket> ignored, CustomPacketPayload payload) ->
-                    payload.type().id();
+            case IndexPacket(PacketType<IndexPacket> ignored, CustomPacketPayload payload) -> payload.type().id();
             default -> null;
         };
 
-        PacketType<? extends @NotNull Packet<?>> packetType = packet.type();
+        PacketType<? extends Packet<?>> packetType = packet.type();
         if (payloadType == null) {
             return packetType.toString();
         } else {

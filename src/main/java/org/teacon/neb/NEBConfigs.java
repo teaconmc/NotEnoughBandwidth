@@ -14,7 +14,6 @@ import net.neoforged.fml.event.lifecycle.FMLConstructModEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.common.ModConfigSpec;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.teacon.neb.network.NetworkManager;
 
@@ -22,19 +21,20 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+@SuppressWarnings("NotNullFieldNotInitialized")
 @EventBusSubscriber(modid = NotEnoughBandwidth.MODID)
 public final class NEBConfigs {
     private static ModConfigSpec CONFIG_SPEC;
-    public static ModConfigSpec.ConfigValue<@NotNull Integer> COMPRESS_WINDOW_SIZE_LOG;
+    public static ModConfigSpec.ConfigValue<Integer> COMPRESS_WINDOW_SIZE_LOG;
 
-    public static ModConfigSpec.ConfigValue<@NotNull Integer> CHUNK_CACHE_BUFFER_SIZE;
-    public static ModConfigSpec.ConfigValue<@NotNull Integer> CHUNK_CACHE_DISTANCE;
-    public static ModConfigSpec.ConfigValue<@NotNull Integer> CHUNK_CACHE_TIMEOUT;
+    public static ModConfigSpec.ConfigValue<Integer> CHUNK_CACHE_BUFFER_SIZE;
+    public static ModConfigSpec.ConfigValue<Integer> CHUNK_CACHE_DISTANCE;
+    public static ModConfigSpec.ConfigValue<Integer> CHUNK_CACHE_TIMEOUT;
 
-    public static ModConfigSpec.ConfigValue<@NotNull Integer> PRESHARED_CHUNK_DISTANCE;
-    public static ModConfigSpec.ConfigValue<@NotNull Integer> PRESHARED_CHUNK_COMPRESS_LEVEL;
+    public static ModConfigSpec.ConfigValue<Integer> PRESHARED_CHUNK_DISTANCE;
+    public static ModConfigSpec.ConfigValue<Integer> PRESHARED_CHUNK_COMPRESS_LEVEL;
 
-    private static ModConfigSpec.ConfigValue<@NotNull List<? extends String>> PACKET_BLACKLIST;
+    private static ModConfigSpec.ConfigValue<List<? extends String>> PACKET_BLACKLIST;
 
     @SubscribeEvent
     private static void on(FMLConstructModEvent event) {

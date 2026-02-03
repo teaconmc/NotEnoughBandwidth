@@ -8,7 +8,6 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.PacketType;
-import org.jetbrains.annotations.NotNull;
 import org.teacon.neb.NotEnoughBandwidth;
 
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -16,15 +15,15 @@ import javax.annotation.ParametersAreNonnullByDefault;
 @MethodsReturnNonnullByDefault
 @ParametersAreNonnullByDefault
 public record CompressedPacket(
-        PacketType<@NotNull CompressedPacket> type,
+        PacketType<CompressedPacket> type,
         ByteBuf buf
-) implements Packet<@NotNull PacketListener> {
-    public static final PacketType<@NotNull CompressedPacket> S_TYPE = new PacketType<>(PacketFlow.SERVERBOUND, NotEnoughBandwidth.id("c2s/compressed"));
-    public static final PacketType<@NotNull CompressedPacket> C_TYPE = new PacketType<>(PacketFlow.CLIENTBOUND, NotEnoughBandwidth.id("s2c/compressed"));
+) implements Packet<PacketListener> {
+    public static final PacketType<CompressedPacket> S_TYPE = new PacketType<>(PacketFlow.SERVERBOUND, NotEnoughBandwidth.id("c2s/compressed"));
+    public static final PacketType<CompressedPacket> C_TYPE = new PacketType<>(PacketFlow.CLIENTBOUND, NotEnoughBandwidth.id("s2c/compressed"));
 
-    public static final StreamCodec<@NotNull FriendlyByteBuf, @NotNull CompressedPacket> S_CODEC = ofCodec(S_TYPE), C_CODEC = ofCodec(C_TYPE);
+    public static final StreamCodec<FriendlyByteBuf, CompressedPacket> S_CODEC = ofCodec(S_TYPE), C_CODEC = ofCodec(C_TYPE);
 
-    private static StreamCodec<@NotNull FriendlyByteBuf, @NotNull CompressedPacket> ofCodec(PacketType<@NotNull CompressedPacket> type) {
+    private static StreamCodec<FriendlyByteBuf, CompressedPacket> ofCodec(PacketType<CompressedPacket> type) {
         return new StreamCodec<>() {
             @Override
             public void encode(FriendlyByteBuf target, CompressedPacket packet) {

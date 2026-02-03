@@ -14,7 +14,6 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.network.connection.ConnectionType;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.teacon.neb.network.aggregate.compress.CompressContext;
 import org.teacon.neb.utils.ContextByteBuf;
@@ -132,7 +131,7 @@ public final class PresharedChunkBundle {
         }
     }
 
-    private static void writeCompressedBody(@NotNull ContextByteBuf buffer, Long2ObjectMap<PresharedChunk> value) {
+    private static void writeCompressedBody(ContextByteBuf buffer, Long2ObjectMap<PresharedChunk> value) {
         ByteBuf output = buffer.alloc().directBuffer();
         try {
             output.writeInt(value.size());

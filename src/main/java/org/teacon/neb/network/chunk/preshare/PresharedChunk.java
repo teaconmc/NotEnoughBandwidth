@@ -6,7 +6,6 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
-import org.jetbrains.annotations.NotNull;
 import org.teacon.neb.network.chunk.preshare.data.BlockEntityInfo;
 import org.teacon.neb.network.chunk.preshare.data.HeightMap;
 import org.teacon.neb.network.chunk.preshare.data.LevelLightSection;
@@ -23,7 +22,7 @@ public record PresharedChunk(
         List<LevelLightSection> lights,
         Int2ObjectMap<BlockEntityInfo> blockEntities
 ) {
-    public static final StreamCodec<@NotNull ContextByteBuf, @NotNull PresharedChunk> STREAM_CODEC = StreamCodec.composite(
+    public static final StreamCodec<ContextByteBuf, PresharedChunk> STREAM_CODEC = StreamCodec.composite(
             Identifier.STREAM_CODEC, PresharedChunk::level,
             ChunkPos.STREAM_CODEC, PresharedChunk::pos,
             HeightMap.STREAM_CODEC, PresharedChunk::heightmaps,

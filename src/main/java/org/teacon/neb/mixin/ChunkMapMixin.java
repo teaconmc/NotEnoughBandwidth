@@ -4,7 +4,6 @@ import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
-import org.jetbrains.annotations.NotNull;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -35,10 +34,10 @@ public abstract class ChunkMapMixin {
     }
 
     @Shadow
-    protected abstract int getPlayerViewDistance(@NotNull ServerPlayer player);
+    protected abstract int getPlayerViewDistance(ServerPlayer player);
 
     @Shadow
-    protected abstract void markChunkPendingToSend(ServerPlayer player, @NotNull ChunkPos pos);
+    protected abstract void markChunkPendingToSend(ServerPlayer player, ChunkPos pos);
 
     @Shadow
     private static void dropChunk(ServerPlayer player, ChunkPos pos) {

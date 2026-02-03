@@ -72,7 +72,8 @@ public class PresharedChunkServer {
             }
 
             @Override
-            public @NotNull Type type() {
+            @NotNull
+            public Type type() {
                 return TYPE;
             }
         });
@@ -106,7 +107,7 @@ public class PresharedChunkServer {
                 try {
                     bundle.write(path, server.registryAccess());
                 } catch (IOException e) {
-                    LOGGER.warn("Cannot write Preshared Chunk Bundle to " + path, e);
+                    LOGGER.warn("Cannot write Preshared Chunk Bundle to {}", path, e);
                     throw new UncheckedIOException(e);
                 }
             });

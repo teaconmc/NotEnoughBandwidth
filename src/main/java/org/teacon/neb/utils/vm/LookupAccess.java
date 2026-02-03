@@ -1,7 +1,6 @@
 package org.teacon.neb.utils.vm;
 
 import com.google.common.collect.ImmutableMap;
-import org.jetbrains.annotations.NotNull;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -30,11 +29,11 @@ public final class LookupAccess {
         }
     }
 
-    public static MethodHandle createConstructor(Class<?> clazz, ImmutableMap<@NotNull String, @NotNull Class<?>> fields) throws ReflectiveOperationException {
+    public static MethodHandle createConstructor(Class<?> clazz, ImmutableMap<String, Class<?>> fields) throws ReflectiveOperationException {
         MethodHandle identity = MethodHandles.identity(clazz);
 
         List<MethodHandle> setters = new ArrayList<>(fields.size());
-        for (Map.Entry<@NotNull String, @NotNull Class<?>> entry : fields.entrySet()) {
+        for (Map.Entry<String, Class<?>> entry : fields.entrySet()) {
             setters.add(IMPL_LOOKUP.findSetter(clazz, entry.getKey(), entry.getValue()));
         }
 

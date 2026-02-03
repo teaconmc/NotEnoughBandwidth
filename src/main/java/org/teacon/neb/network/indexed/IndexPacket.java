@@ -14,7 +14,6 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.common.custom.DiscardedPayload;
 import net.minecraft.resources.Identifier;
 import net.neoforged.neoforge.network.registration.NetworkRegistry;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.teacon.neb.NotEnoughBandwidth;
 
@@ -28,14 +27,14 @@ import javax.annotation.ParametersAreNonnullByDefault;
  */
 @MethodsReturnNonnullByDefault
 @ParametersAreNonnullByDefault
-public record IndexPacket(PacketType<@NotNull IndexPacket> type,
-                          CustomPacketPayload payload) implements Packet<@NotNull PacketListener> {
-    public static final PacketType<@NotNull IndexPacket> S_TYPE = new PacketType<>(PacketFlow.SERVERBOUND, NotEnoughBandwidth.id("c2s/indexed"));
-    public static final PacketType<@NotNull IndexPacket> C_TYPE = new PacketType<>(PacketFlow.CLIENTBOUND, NotEnoughBandwidth.id("s2c/indexed"));
+public record IndexPacket(PacketType<IndexPacket> type,
+                          CustomPacketPayload payload) implements Packet<PacketListener> {
+    public static final PacketType<IndexPacket> S_TYPE = new PacketType<>(PacketFlow.SERVERBOUND, NotEnoughBandwidth.id("c2s/indexed"));
+    public static final PacketType<IndexPacket> C_TYPE = new PacketType<>(PacketFlow.CLIENTBOUND, NotEnoughBandwidth.id("s2c/indexed"));
 
-    public static final StreamCodec<@NotNull FriendlyByteBuf, @NotNull IndexPacket> S_CODEC = ofCodec(S_TYPE), C_CODEC = ofCodec(C_TYPE);
+    public static final StreamCodec<FriendlyByteBuf, IndexPacket> S_CODEC = ofCodec(S_TYPE), C_CODEC = ofCodec(C_TYPE);
 
-    public static StreamCodec<@NotNull FriendlyByteBuf, @NotNull IndexPacket> ofCodec(PacketType<@NotNull IndexPacket> packetType) {
+    public static StreamCodec<FriendlyByteBuf, IndexPacket> ofCodec(PacketType<IndexPacket> packetType) {
         return new StreamCodec<>() {
             @Override
             public void encode(FriendlyByteBuf buf, IndexPacket packet) {
@@ -48,7 +47,7 @@ public record IndexPacket(PacketType<@NotNull IndexPacket> type,
                 }
                 buf.writeVarInt(index);
 
-                StreamCodec<? super FriendlyByteBuf, @NotNull CustomPacketPayload> codec = getCodec(type);
+                StreamCodec<? super FriendlyByteBuf, CustomPacketPayload> codec = getCodec(type);
                 if (codec != null) {
                     codec.encode(buf, packet.payload());
                 } else {
@@ -61,7 +60,7 @@ public record IndexPacket(PacketType<@NotNull IndexPacket> type,
             public IndexPacket decode(FriendlyByteBuf buf) {
                 Identifier type = IndexLookup.getInstance().getType(buf.readVarInt());
 
-                StreamCodec<? super FriendlyByteBuf, @NotNull CustomPacketPayload> codec = getCodec(type);
+                StreamCodec<? super FriendlyByteBuf, CustomPacketPayload> codec = getCodec(type);
                 if (codec != null) {
                     CustomPacketPayload payload;
                     try {
@@ -84,8 +83,8 @@ public record IndexPacket(PacketType<@NotNull IndexPacket> type,
             }
 
             @SuppressWarnings({"unchecked", "UnstableApiUsage"})
-            private @Nullable StreamCodec<? super FriendlyByteBuf, @NotNull CustomPacketPayload> getCodec(Identifier type) {
-                return (StreamCodec<? super FriendlyByteBuf, @NotNull CustomPacketPayload>) NetworkRegistry.getCodec(type, ConnectionProtocol.PLAY, packetType.flow());
+            private @Nullable StreamCodec<? super FriendlyByteBuf, CustomPacketPayload> getCodec(Identifier type) {
+                return (StreamCodec<? super FriendlyByteBuf, CustomPacketPayload>) NetworkRegistry.getCodec(type, ConnectionProtocol.PLAY, packetType.flow());
             }
         };
     }

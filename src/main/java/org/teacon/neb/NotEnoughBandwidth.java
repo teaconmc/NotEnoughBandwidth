@@ -9,6 +9,7 @@ import org.teacon.neb.utils.vm.LookupAccess;
 /**
  * @author USS_Shenzhou
  */
+@SuppressWarnings("NotNullFieldNotInitialized")
 @Mod(NotEnoughBandwidth.MODID)
 public final class NotEnoughBandwidth {
     public static final String MODID = "nebw";

@@ -20,7 +20,7 @@ import java.lang.invoke.VarHandle;
 import java.util.concurrent.locks.Lock;
 
 public record PalettedContainerChange<T>(byte bitsInMemory, byte bitsInStorage, byte[] palette, long[] data) {
-    private static final StreamCodec<@NotNull FriendlyByteBuf, @NotNull PalettedContainerChange<?>> STREAM_CODEC = StreamCodec.composite(
+    private static final StreamCodec<FriendlyByteBuf, PalettedContainerChange<?>> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.BYTE, PalettedContainerChange::bitsInMemory,
             ByteBufCodecs.BYTE, PalettedContainerChange::bitsInStorage,
             ByteBufCodecs.BYTE_ARRAY, PalettedContainerChange::palette,
@@ -29,8 +29,8 @@ public record PalettedContainerChange<T>(byte bitsInMemory, byte bitsInStorage, 
     );
 
     @SuppressWarnings("unchecked")
-    public static <T> StreamCodec<@NotNull FriendlyByteBuf, @NotNull PalettedContainerChange<T>> getCodec() {
-        return (StreamCodec<@NotNull FriendlyByteBuf, @NotNull PalettedContainerChange<T>>) (Object) STREAM_CODEC;
+    public static <T> StreamCodec<FriendlyByteBuf, PalettedContainerChange<T>> getCodec() {
+        return (StreamCodec<FriendlyByteBuf, PalettedContainerChange<T>>) (Object) STREAM_CODEC;
     }
 
     private static final MethodHandle RESIZE;
@@ -59,8 +59,8 @@ public record PalettedContainerChange<T>(byte bitsInMemory, byte bitsInStorage, 
     }
 
     @SuppressWarnings("unchecked")
-    private static <T> Strategy<@NotNull T> getStrategy(PalettedContainer<@NotNull T> instance) {
-        return (Strategy<@NotNull T>) STRATEGY.get(instance);
+    private static <T> Strategy<T> getStrategy(PalettedContainer<T> instance) {
+        return (Strategy<T>) STRATEGY.get(instance);
     }
 
     private static BitStorage getBitStorage(PalettedContainer<?> instance) {
@@ -72,13 +72,13 @@ public record PalettedContainerChange<T>(byte bitsInMemory, byte bitsInStorage, 
     }
 
     @SuppressWarnings("unchecked")
-    private static <T> Palette<@NotNull T> getPalette(PalettedContainer<@NotNull T> instance) {
-        return (Palette<@NotNull T>) PALETTE.get(DATA.get(instance));
+    private static <T> Palette<T> getPalette(PalettedContainer<T> instance) {
+        return (Palette<T>) PALETTE.get(DATA.get(instance));
     }
 
     @SuppressWarnings("unchecked")
-    private static <T> Palette<@NotNull T> getPalette(Object data) {
-        return (Palette<@NotNull T>) PALETTE.get(data);
+    private static <T> Palette<T> getPalette(Object data) {
+        return (Palette<T>) PALETTE.get(data);
     }
 
     private static final NullPointerException NPE = new NullPointerException("INTERNAL IMPLEMENTATION");
@@ -88,7 +88,7 @@ public record PalettedContainerChange<T>(byte bitsInMemory, byte bitsInStorage, 
             Object originalData = DATA.get(instance);
             Object resizedData = RESIZE.invokeExact(instance, originalData, bits);
 
-            Palette<@NotNull T> currenpalette = getPalette(resizedData), oldPalette = getPalette(originalData);
+            Palette<T> currenpalette = getPalette(resizedData), oldPalette = getPalette(originalData);
             BitStorage currentStorage = getBitStorage(resizedData), oldStorage = getBitStorage(originalData);
 
             for (int i = 0; i < oldStorage.getSize(); i++) {
@@ -113,7 +113,7 @@ public record PalettedContainerChange<T>(byte bitsInMemory, byte bitsInStorage, 
         }
     }
 
-    public static <T> PalettedContainerChange<T> from(Lock lock, PalettedContainerRO<@NotNull T> base, PalettedContainerRO<@NotNull T> current) {
+    public static <T> PalettedContainerChange<T> from(Lock lock, PalettedContainerRO<T> base, PalettedContainerRO<T> current) {
         return from(lock, (PalettedContainer<@NotNull T>) base, (PalettedContainer<@NotNull T>) current);
     }
 

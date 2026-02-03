@@ -9,7 +9,6 @@ import net.minecraft.network.PacketEncoder;
 import net.minecraft.network.VarInt;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketType;
-import org.jetbrains.annotations.NotNull;
 import org.teacon.neb.NotEnoughBandwidth;
 import org.teacon.neb.network.aggregate.CompressedPacket;
 import org.teacon.neb.profiler.ProfilerChannel;
@@ -42,7 +41,7 @@ public final class CompressEncoder extends MessageToMessageEncoder<CompressEncod
     private CompressEncoder() {
     }
 
-    public record CompressedTransfer(PacketType<@NotNull CompressedPacket> type, Collection<Packet<?>> packets) {
+    public record CompressedTransfer(PacketType<CompressedPacket> type, Collection<Packet<?>> packets) {
     }
 
     @Override

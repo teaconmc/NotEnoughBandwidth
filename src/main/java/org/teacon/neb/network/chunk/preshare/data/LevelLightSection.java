@@ -9,7 +9,6 @@ import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.lighting.LevelLightEngine;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.teacon.neb.utils.vm.VectorSupport;
 
@@ -19,7 +18,7 @@ import java.util.List;
 public record LevelLightSection(
         byte[] block, byte[] sky
 ) {
-    public static final StreamCodec<@NotNull FriendlyByteBuf, @NotNull LevelLightSection> STREAM_CODEC = StreamCodec.composite(
+    public static final StreamCodec<FriendlyByteBuf, LevelLightSection> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.BYTE_ARRAY, LevelLightSection::block,
             ByteBufCodecs.BYTE_ARRAY, LevelLightSection::sky,
             LevelLightSection::new
@@ -58,7 +57,7 @@ public record LevelLightSection(
     public record Diff(
             byte[] block, byte[] sky
     ) {
-        public static final StreamCodec<@NotNull FriendlyByteBuf, @NotNull Diff> STREAM_CODEC = StreamCodec.composite(
+        public static final StreamCodec<FriendlyByteBuf, Diff> STREAM_CODEC = StreamCodec.composite(
                 ByteBufCodecs.BYTE_ARRAY, Diff::block,
                 ByteBufCodecs.BYTE_ARRAY, Diff::sky,
                 Diff::new

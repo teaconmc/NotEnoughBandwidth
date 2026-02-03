@@ -16,7 +16,6 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.chunk.LevelChunk;
 import org.apache.commons.lang3.Validate;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.teacon.neb.utils.ChunkRelativePos;
 import org.teacon.neb.utils.ContextByteBuf;
@@ -31,7 +30,7 @@ public record BlockEntityInfo(
         BlockEntityType<?> type,
         CompoundTag data
 ) {
-    public static final StreamCodec<@NotNull ContextByteBuf, @NotNull Int2ObjectMap<BlockEntityInfo>> BLOCK_CODEC = new StreamCodec<>() {
+    public static final StreamCodec<ContextByteBuf, Int2ObjectMap<BlockEntityInfo>> BLOCK_CODEC = new StreamCodec<>() {
         @Override
         public Int2ObjectMap<BlockEntityInfo> decode(ContextByteBuf buffer) {
             int size = buffer.readVarInt();
@@ -52,7 +51,7 @@ public record BlockEntityInfo(
         }
     };
 
-    private static final StreamCodec<@NotNull ContextByteBuf, @NotNull BlockEntityInfo> STREAM_CODEC = StreamCodec.composite(
+    private static final StreamCodec<ContextByteBuf, BlockEntityInfo> STREAM_CODEC = StreamCodec.composite(
             ChunkRelativePos.STREAM_CODEC, BlockEntityInfo::pos,
             ByteBufCodecs.registry(BuiltInRegistries.BLOCK_ENTITY_TYPE.key()), BlockEntityInfo::type,
             ByteBufCodecs.COMPOUND_TAG, BlockEntityInfo::data,
@@ -81,8 +80,8 @@ public record BlockEntityInfo(
     ) {
         private static final byte FLAG_NULL_NULL = 0, FLAG_NULL_VALUE = 1, FLAG_VALUE_VALUE = 2;
 
-        public static final StreamCodec<@NotNull RegistryFriendlyByteBuf, @NotNull Diff> STREAM_CODEC = new StreamCodec<>() {
-            private static final StreamCodec<@NotNull RegistryFriendlyByteBuf, @NotNull BlockEntityType<?>> BE_TYPE_CODEC =
+        public static final StreamCodec<RegistryFriendlyByteBuf, Diff> STREAM_CODEC = new StreamCodec<>() {
+            private static final StreamCodec<RegistryFriendlyByteBuf, BlockEntityType<?>> BE_TYPE_CODEC =
                     ByteBufCodecs.registry(Registries.BLOCK_ENTITY_TYPE);
 
             @Override

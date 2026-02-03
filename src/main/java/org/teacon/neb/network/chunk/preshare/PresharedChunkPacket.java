@@ -26,9 +26,9 @@ public record PresharedChunkPacket(
         List<LevelLightSection.Diff> lights,
         List<BlockEntityInfo.Diff> blockEntities
 ) implements CustomPacketPayload {
-    public static final Type<@NotNull PresharedChunkPacket> TYPE = new Type<>(NotEnoughBandwidth.id("s2c/preshared_chunk"));
+    public static final Type<PresharedChunkPacket> TYPE = new Type<>(NotEnoughBandwidth.id("s2c/preshared_chunk"));
 
-    public static final StreamCodec<@NotNull RegistryFriendlyByteBuf, @NotNull PresharedChunkPacket> STREAM_CODEC = StreamCodec.composite(
+    public static final StreamCodec<RegistryFriendlyByteBuf, PresharedChunkPacket> STREAM_CODEC = StreamCodec.composite(
             ChunkPos.STREAM_CODEC, PresharedChunkPacket::pos,
             HeightMap.Diff.STREAM_CODEC, PresharedChunkPacket::heightmaps,
             SectionInstance.Diff.STREAM_CODEC.apply(ByteBufCodecs.list()), PresharedChunkPacket::sections,
@@ -39,7 +39,7 @@ public record PresharedChunkPacket(
 
     @Override
     @NotNull
-    public Type<? extends @NotNull CustomPacketPayload> type() {
+    public Type<? extends CustomPacketPayload> type() {
         return TYPE;
     }
 

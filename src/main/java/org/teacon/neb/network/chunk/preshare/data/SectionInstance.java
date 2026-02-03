@@ -8,7 +8,6 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
-import org.jetbrains.annotations.NotNull;
 import org.teacon.neb.utils.ContextByteBuf;
 
 import java.util.ArrayList;
@@ -20,7 +19,7 @@ public record SectionInstance(
         LevelChunkSection chunk,
         Lock lock
 ) {
-    public static final StreamCodec<@NotNull ContextByteBuf, @NotNull SectionInstance> STREAM_CODEC = StreamCodec.composite(
+    public static final StreamCodec<ContextByteBuf, SectionInstance> STREAM_CODEC = StreamCodec.composite(
             new StreamCodec<>() {
                 @Override
                 public LevelChunkSection decode(ContextByteBuf buffer) {
@@ -37,7 +36,7 @@ public record SectionInstance(
             chunk -> new SectionInstance(chunk, new ReentrantLock())
     );
 
-    public static @NotNull List<SectionInstance> createSectionsCache(LevelChunk chunk) {
+    public static List<SectionInstance> createSectionsCache(LevelChunk chunk) {
         List<SectionInstance> sections = new ArrayList<>();
         for (LevelChunkSection chunkSection : chunk.getSections()) {
             sections.add(new SectionInstance(chunkSection.copy(), new ReentrantLock()));
@@ -47,9 +46,9 @@ public record SectionInstance(
 
     public record Diff(
             PalettedContainerChange<BlockState> states,
-            PalettedContainerChange<Holder<@NotNull Biome>> biomes
+            PalettedContainerChange<Holder<Biome>> biomes
     ) {
-        public static final StreamCodec<@NotNull FriendlyByteBuf, @NotNull Diff> STREAM_CODEC = StreamCodec.composite(
+        public static final StreamCodec<FriendlyByteBuf, Diff> STREAM_CODEC = StreamCodec.composite(
                 PalettedContainerChange.getCodec(), Diff::states,
                 PalettedContainerChange.getCodec(), Diff::biomes,
                 Diff::new

@@ -4,7 +4,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Range;
 
 public record ChunkRelativePos(
@@ -14,7 +13,7 @@ public record ChunkRelativePos(
 
         @Range(from = 0, to = 127) byte flag
 ) {
-    public static final StreamCodec<@NotNull FriendlyByteBuf, @NotNull ChunkRelativePos> STREAM_CODEC = new StreamCodec<>() {
+    public static final StreamCodec<FriendlyByteBuf, ChunkRelativePos> STREAM_CODEC = new StreamCodec<>() {
         @Override
         public ChunkRelativePos decode(FriendlyByteBuf input) {
             return unpack(input.readInt());

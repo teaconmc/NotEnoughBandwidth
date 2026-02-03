@@ -38,7 +38,7 @@ public final class Snapshot implements Iterable<Object2LongMap.Entry<String>> {
         String type = switch (packet) {
             case VanillaCustomPayload payload -> payload.payload().type().id().toString();
 
-            case IndexPacket(PacketType<@NotNull IndexPacket> ignored, CustomPacketPayload payload) ->
+            case IndexPacket(PacketType<IndexPacket> ignored, CustomPacketPayload payload) ->
                     payload.type().id().toString();
 
             case ClientboundBlockEntityDataPacket entityData -> {

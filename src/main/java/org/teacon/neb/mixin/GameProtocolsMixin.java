@@ -5,7 +5,6 @@ import net.minecraft.network.protocol.ProtocolInfoBuilder;
 import net.minecraft.network.protocol.game.GameProtocols;
 import net.neoforged.neoforge.common.extensions.IClientCommonPacketListenerExtension;
 import net.neoforged.neoforge.common.extensions.IServerCommonPacketListenerExtension;
-import org.jetbrains.annotations.NotNull;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -17,7 +16,7 @@ import org.teacon.neb.network.indexed.IndexPacket;
 public class GameProtocolsMixin {
     @Inject(method = "lambda$static$1", at = @At("TAIL"))
     private static void onRegisterServerBoundPackets(
-            ProtocolInfoBuilder<@NotNull IServerCommonPacketListenerExtension, @NotNull FriendlyByteBuf, GameProtocols.@NotNull Context> builder,
+            ProtocolInfoBuilder<IServerCommonPacketListenerExtension, FriendlyByteBuf, GameProtocols.Context> builder,
             CallbackInfo ci
     ) {
         builder.addPacket(IndexPacket.S_TYPE, IndexPacket.S_CODEC)
@@ -26,7 +25,7 @@ public class GameProtocolsMixin {
 
     @Inject(method = "lambda$static$2", at = @At("TAIL"))
     private static void onRegisterClientBoundPackets(
-            ProtocolInfoBuilder<@NotNull IClientCommonPacketListenerExtension, @NotNull FriendlyByteBuf, GameProtocols.@NotNull Context> builder,
+            ProtocolInfoBuilder<IClientCommonPacketListenerExtension, FriendlyByteBuf, GameProtocols.Context> builder,
             CallbackInfo ci
     ) {
         builder.addPacket(IndexPacket.C_TYPE, IndexPacket.C_CODEC)
