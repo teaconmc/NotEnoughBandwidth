@@ -1,6 +1,5 @@
 package org.teacon.neb.network.indexed;
 
-import com.mojang.logging.annotations.MethodsReturnNonnullByDefault;
 import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.PacketListener;
@@ -17,16 +16,12 @@ import net.neoforged.neoforge.network.registration.NetworkRegistry;
 import org.jetbrains.annotations.Nullable;
 import org.teacon.neb.NotEnoughBandwidth;
 
-import javax.annotation.ParametersAreNonnullByDefault;
-
 /**
  * Instead of vanilla {@link CustomPacketPayload},
  * we here use such protocol to avoid putting a huge Identifier into ByteBuf.
  *
  * @author USS_Shenzhou, Burning_TNT
  */
-@MethodsReturnNonnullByDefault
-@ParametersAreNonnullByDefault
 public record IndexPacket(PacketType<IndexPacket> type,
                           CustomPacketPayload payload) implements Packet<PacketListener> {
     public static final PacketType<IndexPacket> S_TYPE = new PacketType<>(PacketFlow.SERVERBOUND, NotEnoughBandwidth.id("c2s/indexed"));

@@ -1,6 +1,5 @@
 package org.teacon.neb.network.aggregate;
 
-import com.mojang.logging.annotations.MethodsReturnNonnullByDefault;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.PacketListener;
@@ -10,10 +9,6 @@ import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.PacketType;
 import org.teacon.neb.NotEnoughBandwidth;
 
-import javax.annotation.ParametersAreNonnullByDefault;
-
-@MethodsReturnNonnullByDefault
-@ParametersAreNonnullByDefault
 public record CompressedPacket(
         PacketType<CompressedPacket> type,
         ByteBuf buf

@@ -30,14 +30,12 @@ public final class LookupAccess {
     }
 
     public static MethodHandle createConstructor(Class<?> clazz, ImmutableMap<String, Class<?>> fields) throws ReflectiveOperationException {
-        MethodHandle identity = MethodHandles.identity(clazz);
-
         List<MethodHandle> setters = new ArrayList<>(fields.size());
         for (Map.Entry<String, Class<?>> entry : fields.entrySet()) {
             setters.add(IMPL_LOOKUP.findSetter(clazz, entry.getKey(), entry.getValue()));
         }
 
-        MethodHandle transmuted = identity;
+        MethodHandle transmuted = MethodHandles.identity(clazz);
         for (int i = setters.size() - 1; i >= 0; i--) {
             MethodHandle setter = setters.get(i);
 

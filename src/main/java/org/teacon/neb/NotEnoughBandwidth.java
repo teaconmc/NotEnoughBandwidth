@@ -5,6 +5,7 @@ import net.minecraft.resources.Identifier;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import org.teacon.neb.utils.vm.LookupAccess;
+import org.teacon.neb.utils.vm.VectorSupport;
 
 /**
  * @author USS_Shenzhou
@@ -18,6 +19,7 @@ public final class NotEnoughBandwidth {
     public NotEnoughBandwidth(ModContainer container) {
         try {
             LookupAccess.IMPL_LOOKUP.ensureInitialized(Zstd.class);
+            LookupAccess.IMPL_LOOKUP.ensureInitialized(VectorSupport.class);
         } catch (IllegalAccessException e) {
             throw new AssertionError(e);
         } catch (UnsatisfiedLinkError e) {
