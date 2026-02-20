@@ -14,7 +14,13 @@ import org.teacon.neb.utils.vm.VectorSupport;
 
 import java.util.concurrent.locks.Lock;
 
-import static org.teacon.neb.network.chunk.preshare.data.palette.PaletteContainerAccess.*;
+import static org.teacon.neb.network.chunk.preshare.data.palette.PaletteContainerAccess.allocateDataFrom;
+import static org.teacon.neb.network.chunk.preshare.data.palette.PaletteContainerAccess.getBitStorage;
+import static org.teacon.neb.network.chunk.preshare.data.palette.PaletteContainerAccess.getConfiguration;
+import static org.teacon.neb.network.chunk.preshare.data.palette.PaletteContainerAccess.getData;
+import static org.teacon.neb.network.chunk.preshare.data.palette.PaletteContainerAccess.getPalette;
+import static org.teacon.neb.network.chunk.preshare.data.palette.PaletteContainerAccess.getStrategy;
+import static org.teacon.neb.network.chunk.preshare.data.palette.PaletteContainerAccess.setData;
 
 public record PalettedContainerChange<T>(byte bitsInMemory, byte bitsInStorage, byte[] palette, long[] data) {
     private static final StreamCodec<FriendlyByteBuf, PalettedContainerChange<?>> STREAM_CODEC = StreamCodec.composite(

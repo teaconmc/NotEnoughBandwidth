@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Objects;
 
 @SuppressWarnings("NotNullFieldNotInitialized")
-@EventBusSubscriber(modid = NotEnoughBandwidth.MODID)
+@EventBusSubscriber
 public final class NEBConfigs {
     private static ModConfigSpec CONFIG_SPEC;
     public static ModConfigSpec.ConfigValue<Integer> COMPRESS_WINDOW_SIZE_LOG;
@@ -100,7 +100,7 @@ public final class NEBConfigs {
         NotEnoughBandwidth.MOD_CONTAINER.registerConfig(ModConfig.Type.SERVER, CONFIG_SPEC);
     }
 
-    @EventBusSubscriber(modid = NotEnoughBandwidth.MODID, value = Dist.CLIENT)
+    @EventBusSubscriber(Dist.CLIENT)
     private static class Client {
         @SubscribeEvent
         private static void on(FMLConstructModEvent event) {

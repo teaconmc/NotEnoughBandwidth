@@ -35,7 +35,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
-@EventBusSubscriber(modid = NotEnoughBandwidth.MODID)
+@EventBusSubscriber
 public class PresharedChunkServer {
     private static final Logger LOGGER = LogUtils.getLogger();
 

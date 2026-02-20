@@ -48,7 +48,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-@EventBusSubscriber(modid = NotEnoughBandwidth.MODID)
+@EventBusSubscriber
 public class NEBCommands {
     private NEBCommands() {
     }
@@ -238,7 +238,7 @@ public class NEBCommands {
         }
     }
 
-    @EventBusSubscriber(modid = NotEnoughBandwidth.MODID, value = Dist.CLIENT)
+    @EventBusSubscriber(Dist.CLIENT)
     private static final class ClientCommands {
         private ClientCommands() {
         }

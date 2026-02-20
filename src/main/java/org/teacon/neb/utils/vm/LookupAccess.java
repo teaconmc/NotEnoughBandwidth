@@ -1,10 +1,12 @@
 package org.teacon.neb.utils.vm;
 
 import com.google.common.collect.ImmutableMap;
+import sun.misc.Unsafe;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -18,7 +20,7 @@ public final class LookupAccess {
 
     static {
         try {
-            IMPL_LOOKUP = LookupAccessImpl.INSTANCE;
+            IMPL_LOOKUP = acquireTrustedLookup();
 
             Class<?> unsafe = Class.forName("jdk.internal.misc.Unsafe");
             Object theUnsafe = LookupAccess.IMPL_LOOKUP.findStaticVarHandle(unsafe, "theUnsafe", unsafe).get();
@@ -27,6 +29,16 @@ public final class LookupAccess {
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
         }
+    }
+
+    @SuppressWarnings("removal")
+    private static MethodHandles.Lookup acquireTrustedLookup() throws ReflectiveOperationException, LinkageError {
+        Field sunUnsafe = Class.forName("sun.misc.Unsafe").getDeclaredField("theUnsafe");
+        sunUnsafe.setAccessible(true);
+        Unsafe theSunUnsafe = (Unsafe) sunUnsafe.get(null);
+
+        Field implLookup = MethodHandles.Lookup.class.getDeclaredField("IMPL_LOOKUP");
+        return (MethodHandles.Lookup) theSunUnsafe.getObject(theSunUnsafe.staticFieldBase(implLookup), theSunUnsafe.staticFieldOffset(implLookup));
     }
 
     public static MethodHandle createConstructor(Class<?> clazz, ImmutableMap<String, Class<?>> fields) throws ReflectiveOperationException {

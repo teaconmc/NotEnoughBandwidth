@@ -15,7 +15,6 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
-import org.teacon.neb.NotEnoughBandwidth;
 import org.teacon.neb.network.chunk.preshare.PresharedChunk;
 import org.teacon.neb.network.chunk.preshare.PresharedChunkGuardPacket;
 import org.teacon.neb.network.chunk.preshare.PresharedChunkPacket;
@@ -34,7 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-@EventBusSubscriber(modid = NotEnoughBandwidth.MODID, value = Dist.CLIENT)
+@EventBusSubscriber(value = Dist.CLIENT)
 public class PresharedChunkPacketClientImpl {
     private static final MethodHandle CLCPD_NEW, CLCPD_BEI_NEW, CLUPD_NEW, CLCWLP_NEW;
 

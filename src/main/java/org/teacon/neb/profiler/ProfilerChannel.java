@@ -3,6 +3,11 @@ package org.teacon.neb.profiler;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import org.jetbrains.annotations.Nullable;
 import org.teacon.neb.profiler.impl.PrometheusProfiler;
 
@@ -11,7 +16,7 @@ import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-@SuppressWarnings("unchecked")
+@EventBusSubscriber
 public final class ProfilerChannel {
     public interface IProfiler {
         void onTransmitPacket(Snapshot snapshot);
@@ -40,6 +45,7 @@ public final class ProfilerChannel {
         WRITE = rwLock.writeLock();
     }
 
+    @SuppressWarnings("unchecked")
     @Nullable
     public <T extends IProfiler> T add(T profiler) {
         Objects.requireNonNull(profiler, "profiler");
@@ -64,6 +70,7 @@ public final class ProfilerChannel {
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Nullable
     public <T extends IProfiler> T take(Class<T> clazz) {
         Objects.requireNonNull(clazz, "clazz");
@@ -82,6 +89,15 @@ public final class ProfilerChannel {
             }
 
             return null;
+        } finally {
+            WRITE.unlock();
+        }
+    }
+
+    public void removeAll() {
+        WRITE.lock();
+        try {
+            this.profilers = new IProfiler[0];
         } finally {
             WRITE.unlock();
         }
@@ -149,5 +165,18 @@ public final class ProfilerChannel {
 
             return totalValue / totalWeight;
         }
+    }
+
+    @EventBusSubscriber(Dist.CLIENT)
+    private static final class ClientImpl {
+        @SubscribeEvent
+        private static void on(ClientPlayerNetworkEvent.LoggingOut event) {
+            CLIENT.removeAll();
+        }
+    }
+
+    @SubscribeEvent
+    private static void on(ServerStoppingEvent event) {
+        SERVER.removeAll();
     }
 }

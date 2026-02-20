@@ -18,7 +18,7 @@ import org.teacon.neb.network.chunk.preshare.data.SectionInstance;
 
 import java.util.List;
 
-@EventBusSubscriber(modid = NotEnoughBandwidth.MODID)
+@EventBusSubscriber
 public record PresharedChunkPacket(
         ChunkPos pos,
         HeightMap.Diff heightmaps,

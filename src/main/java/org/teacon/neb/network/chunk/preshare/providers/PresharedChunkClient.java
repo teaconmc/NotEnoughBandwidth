@@ -5,7 +5,6 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
-import org.teacon.neb.NotEnoughBandwidth;
 import org.teacon.neb.network.chunk.preshare.PresharedChunkBundle;
 
 import java.io.IOException;
@@ -13,7 +12,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.UUID;
 
-@EventBusSubscriber(modid = NotEnoughBandwidth.MODID, value = Dist.CLIENT)
+@EventBusSubscriber(Dist.CLIENT)
 public class PresharedChunkClient {
     public static volatile PresharedChunkBundle lookup = PresharedChunkBundle.EMPTY;
 

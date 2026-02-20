@@ -13,7 +13,7 @@ import org.teacon.neb.NotEnoughBandwidth;
 
 import java.util.UUID;
 
-@EventBusSubscriber(modid = NotEnoughBandwidth.MODID)
+@EventBusSubscriber
 public record PresharedChunkGuardPacket(
         UUID version
 ) implements CustomPacketPayload {

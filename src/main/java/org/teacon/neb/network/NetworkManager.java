@@ -8,7 +8,6 @@ import net.minecraft.network.protocol.PacketType;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 import net.neoforged.fml.common.EventBusSubscriber;
-import org.teacon.neb.NotEnoughBandwidth;
 import org.teacon.neb.network.aggregate.AggregateBuffer;
 import org.teacon.neb.network.aggregate.CompressedPacket;
 import org.teacon.neb.network.indexed.IndexLookup;
@@ -16,7 +15,7 @@ import org.teacon.neb.network.indexed.IndexPacket;
 
 import java.util.Set;
 
-@EventBusSubscriber(modid = NotEnoughBandwidth.MODID)
+@EventBusSubscriber
 public final class NetworkManager {
     private NetworkManager() {
     }
