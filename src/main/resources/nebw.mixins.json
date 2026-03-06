@@ -14,6 +14,9 @@
     "ProtocolSwapHandlerMixin",
     "nf.NetworkRegistryMixin"
   ],
+  "client": [
+    "LevelRendererMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }
