@@ -106,7 +106,14 @@ public final class VectorSupport {
                             "loadModule",
                             MethodType.methodType(Module.class, String.class)
                     );
-                    Module _ = (Module) loadModule.invokeExact("jdk.incubator.vector");
+                    MethodHandle addReads = LookupAccess.IMPL_LOOKUP.findStatic(
+                            Class.forName("jdk.internal.module.Modules"),
+                            "addReads",
+                            MethodType.methodType(void.class, Module.class, Module.class)
+                    );
+
+                    Module vector = (Module) loadModule.invokeExact("jdk.incubator.vector");
+                    addReads.invokeExact(VectorSupport.class.getModule(), vector);
                 }
 
                 vectorized = Class.forName(VectorSupport.class.getName() + "$Vectorized");
