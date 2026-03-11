@@ -9,6 +9,7 @@ import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.lighting.LevelLightEngine;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 import org.teacon.neb.utils.vm.VectorSupport;
 
@@ -41,7 +42,8 @@ public record LevelLightSection(
         return lights;
     }
 
-    private static byte[] createDataLayer(LevelLightEngine lightEngine, SectionPos pos, LightLayer type, boolean allocateNull) {
+    @Contract(value = "_, _, _, true -> !null")
+    private static byte @Nullable [] createDataLayer(LevelLightEngine lightEngine, SectionPos pos, LightLayer type, boolean allocateNull) {
         DataLayer data = lightEngine.getLayerListener(type).getDataLayerData(pos);
         if (data == null) {
             return allocateNull ? new byte[2048] : null;

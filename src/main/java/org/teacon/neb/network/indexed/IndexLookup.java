@@ -1,11 +1,10 @@
 package org.teacon.neb.network.indexed;
 
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import net.minecraft.resources.Identifier;
 import net.neoforged.neoforge.network.registration.PayloadRegistration;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,7 +16,7 @@ public final class IndexLookup {
     public static final int EMPTY_INT = -2;
 
     private static final IndexLookup EMPTY_LOOKUP = new IndexLookup(List.of());
-    private static final AtomicReference<IndexLookup> INSTANCE = new AtomicReference<>();
+    private static final AtomicReference<@Nullable IndexLookup> INSTANCE = new AtomicReference<>();
 
     public static IndexLookup getInstance() {
         IndexLookup instance = INSTANCE.getPlain();
@@ -44,12 +43,12 @@ public final class IndexLookup {
 
     private final Object2IntMap<Identifier> location2id;
 
-    private final Int2ObjectMap<Identifier> id2location;
+    private final Identifier[] id2location;
 
     private IndexLookup(List<Identifier> locations) {
         location2id = new Object2IntOpenHashMap<>(locations.size());
         location2id.defaultReturnValue(EMPTY_INT);
-        id2location = new Int2ObjectOpenHashMap<>(locations.size());
+        id2location = new Identifier[locations.size()];
 
         if (locations.isEmpty()) {
             return;
@@ -58,7 +57,9 @@ public final class IndexLookup {
         locations.sort(null);
         for (int i = 0; i < locations.size(); i++) {
             Identifier location = locations.get(i);
-            if (location2id.put(location, i) != EMPTY_INT || id2location.put(i, location) != null) {
+            id2location[i] = location;
+
+            if (location2id.put(location, i) != EMPTY_INT) {
                 throw new RuntimeException("Duplicate packet registration: " + location);
             }
         }
@@ -69,6 +70,9 @@ public final class IndexLookup {
     }
 
     public Identifier getType(int id) {
-        return id2location.get(id);
+        if (id < 0 || id >= id2location.length) {
+            throw new IllegalArgumentException("Unknown packet index: " + id);
+        }
+        return id2location[id];
     }
 }

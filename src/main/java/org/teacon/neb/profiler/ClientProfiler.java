@@ -7,6 +7,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.RegisterDebugEntriesEvent;
+import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 import org.teacon.neb.NotEnoughBandwidth;
 
@@ -26,6 +27,7 @@ public final class ClientProfiler implements ProfilerChannel.IProfiler {
     private ClientProfiler() {
     }
 
+    @Nullable
     private static ClientProfiler instance;
 
     @SubscribeEvent

@@ -33,9 +33,10 @@ public abstract class ConnectionMixin {
 
     @Inject(method = "sendPacket", at = @At("HEAD"), cancellable = true)
     private void onSendPacket(Packet<?> packet, @Nullable ChannelFutureListener listener, boolean flush, CallbackInfo ci) {
+        Connection self = (Connection) (Object) this;
         if (packet.isTerminal()) {
-            NetworkManager.release((Connection) (Object) this);
-        } else if (listener == null && NetworkManager.onSendPacket((Connection) (Object) this, packet)) {
+            NetworkManager.release(self);
+        } else if (listener == null && NetworkManager.onSendPacket(self, packet)) {
             this.sentPackets++;
             ci.cancel();
         }
