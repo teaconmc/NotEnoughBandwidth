@@ -133,9 +133,8 @@ public class PresharedChunkPacketClientImpl {
         profiler.pop();
 
         listener.enqueueWork(() -> {
-            long state = CachedChunkDebugOverlay.encodeState(CachedChunkDebugOverlay.STATE_RECEIVE_PRESHARED_CHUNK);
-            CachedChunkDebugOverlay.states.put(ChunkPos.pack(pkt.getX(), pkt.getZ()), state);
             listener.handle(pkt);
+            CachedChunkDebugOverlay.mark(ChunkPos.pack(pkt.getX(), pkt.getZ()), CachedChunkDebugOverlay.STATE_RECEIVE_PRESHARED_CHUNK);
         });
     }
 

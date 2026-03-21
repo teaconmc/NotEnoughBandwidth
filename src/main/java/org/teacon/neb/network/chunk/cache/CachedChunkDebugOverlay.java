@@ -17,6 +17,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RegisterDebugEntriesEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.gui.GuiLayer;
+import org.intellij.lang.annotations.MagicConstant;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.teacon.neb.NotEnoughBandwidth;
@@ -27,6 +28,21 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
 
 @EventBusSubscriber
 public final class CachedChunkDebugOverlay implements GuiLayer {
+    public static final byte STATE_RECEIVE_CHUNK = 1, STATE_RECEIVE_PRESHARED_CHUNK = 2;
+
+    public static void mark(
+            long chunk,
+            @MagicConstant(flags = {STATE_RECEIVE_CHUNK, STATE_RECEIVE_PRESHARED_CHUNK}) byte state
+    ) {
+        states.put(chunk, encodeState(state));
+    }
+
+    private static final long TIME_BASE = System.currentTimeMillis();
+    private static final Long2LongMap states = new Long2LongOpenHashMap();
+
+    public static long encodeState(byte state) {
+        return ((System.currentTimeMillis() - TIME_BASE) << 4) | (state & 0xF);
+    }
 
     private static final Identifier ID = NotEnoughBandwidth.id("visualize_cached_chunk");
 
@@ -61,22 +77,12 @@ public final class CachedChunkDebugOverlay implements GuiLayer {
         }
     }
 
-    // FIXME: Reorganize state API here.
-    private static final long TIME_BASE = System.currentTimeMillis();
-
-    public static final Long2LongMap states = new Long2LongOpenHashMap();
-
-    public static final byte STATE_RECEIVE_CHUNK = 1, STATE_RECEIVE_PRESHARED_CHUNK = 2;
-
-    public static long encodeState(byte state) {
-        return ((System.currentTimeMillis() - TIME_BASE) << 4) | (state & 0xF);
-    }
+    private static final int CELL_SIZE = 4, CELL_GAP = 1, CELL_STEP = CELL_SIZE + CELL_GAP;
 
     @Override
     public void render(@NonNull GuiGraphicsExtractor graphics, @NonNull DeltaTracker deltaTracker) {
-        Minecraft minecraft = Minecraft.getInstance();
-
         // FIXME: Fucking Mojang use a List to store active debuggers.
+        Minecraft minecraft = Minecraft.getInstance();
         if (!minecraft.debugEntries.getCurrentlyEnabled().contains(ID) || minecraft.level == null || minecraft.player == null) {
             states.clear();
             return;
@@ -89,38 +95,19 @@ public final class CachedChunkDebugOverlay implements GuiLayer {
         int viewCenterX = (int) CCC_STORAGE_VCX.getVolatile(storage), viewCenterZ = (int) CCC_STORAGE_VCZ.getVolatile(storage);
         int chunkRadius = (int) CCC_STORAGE_CR.get(storage), viewRange = chunkRadius * 2 + 1;
 
-        final int size = 4, gap = 1;
-
-        int xStart = graphics.guiWidth() - viewRange * (size + gap);
-        int yStart = graphics.guiHeight() - viewRange * (size + gap);
-        graphics.fill(xStart - gap, yStart - gap, graphics.guiWidth(), graphics.guiHeight(), 0xC0000000);
+        int xStart = graphics.guiWidth() - viewRange * CELL_STEP;
+        int yStart = graphics.guiHeight() - viewRange * CELL_STEP;
+        graphics.fill(xStart - CELL_GAP, yStart - CELL_GAP, graphics.guiWidth(), graphics.guiHeight(), 0xC0000000);
 
         ChunkPos chunkPos = minecraft.player.chunkPosition();
         for (int x0 = chunkPos.x() - chunkRadius, x = x0; x < viewRange + chunkRadius; x++) {
             for (int z0 = chunkPos.z() - chunkRadius, z = z0; z < viewRange + chunkRadius; z++) {
-                int color;
-
-                long state = states.get(ChunkPos.pack(x, z));
-                if (state != 0) {
-                    color = switch ((int) (state & 0xF)) {
-                        case STATE_RECEIVE_CHUNK -> 0xC000FF00;
-                        case STATE_RECEIVE_PRESHARED_CHUNK -> 0xC00000FF;
-                        default -> throw new AssertionError();
-                    };
-                } else if (x == viewCenterX && z == viewCenterZ) {
-                    color = 0xC0FF0000;
-                } else {
-                    LevelChunk chunk = chunks.get(Math.floorMod(z, viewRange) * viewRange + Math.floorMod(x, viewRange));
-                    if (chunk != null && chunk.getPos().x() == x && chunk.getPos().z() == z) {
-                        color = 0xC0FFFFFF;
-                    } else {
-                        continue;
-                    }
+                int color = computeColor(x, z, viewCenterX, viewCenterZ, chunks, viewRange);
+                if (color != 0) {
+                    int xCellStart = xStart + (x - x0) * CELL_STEP;
+                    int yCellStart = yStart + (z - z0) * CELL_STEP;
+                    graphics.fill(xCellStart, yCellStart, xCellStart + CELL_SIZE, yCellStart + CELL_SIZE, color);
                 }
-
-                int xCellStart = xStart + (x - x0) * (size + gap);
-                int yCellStart = yStart + (z - z0) * (size + gap);
-                graphics.fill(xCellStart, yCellStart, xCellStart + size, yCellStart + size, color);
             }
         }
 
@@ -131,5 +118,27 @@ public final class CachedChunkDebugOverlay implements GuiLayer {
                 iterator.remove();
             }
         }
+    }
+
+    private int computeColor(int x, int z, int viewCenterX, int viewCenterZ, AtomicReferenceArray<@Nullable LevelChunk> chunks, int viewRange) {
+        long state = states.get(ChunkPos.pack(x, z));
+        if (state != 0) {
+            return switch ((int) (state & 0xF)) {
+                case STATE_RECEIVE_CHUNK -> 0xC000FF00;
+                case STATE_RECEIVE_PRESHARED_CHUNK -> 0xC00000FF;
+                default -> throw new AssertionError();
+            };
+        }
+
+        if (x == viewCenterX && z == viewCenterZ) {
+            return 0xC0FF0000;
+        }
+
+        LevelChunk chunk = chunks.get(Math.floorMod(z, viewRange) * viewRange + Math.floorMod(x, viewRange));
+        if (chunk != null && chunk.getPos().x() == x && chunk.getPos().z() == z) {
+            return 0xC0FFFFFF;
+        }
+
+        return 0;
     }
 }

@@ -13,7 +13,9 @@ import org.teacon.neb.network.chunk.cache.CachedChunkDebugOverlay;
 public class ClientPacketListenerMixin {
     @Inject(method = "handleLevelChunkWithLight", at = @At("RETURN"))
     private void afterHandleLevelChunkWithLight(ClientboundLevelChunkWithLightPacket packet, CallbackInfo ci) {
-        long state = CachedChunkDebugOverlay.encodeState(CachedChunkDebugOverlay.STATE_RECEIVE_CHUNK);
-        CachedChunkDebugOverlay.states.putIfAbsent(ChunkPos.pack(packet.getX(), packet.getZ()), state);
+        CachedChunkDebugOverlay.mark(
+                ChunkPos.pack(packet.getX(), packet.getZ()),
+                CachedChunkDebugOverlay.STATE_RECEIVE_CHUNK
+        );
     }
 }
