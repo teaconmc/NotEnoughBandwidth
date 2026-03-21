@@ -42,7 +42,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
-@EventBusSubscriber(value = Dist.CLIENT)
+@EventBusSubscriber(Dist.CLIENT)
 public class PresharedChunkPacketClientImpl {
     private static final MethodHandle CLCPD_NEW, CLCPD_BEI_NEW, CLUPD_NEW, CLCWLP_NEW;
 

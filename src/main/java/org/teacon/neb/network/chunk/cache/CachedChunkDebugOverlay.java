@@ -12,6 +12,7 @@ import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RegisterDebugEntriesEvent;
@@ -26,7 +27,7 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
-@EventBusSubscriber
+@EventBusSubscriber(Dist.CLIENT)
 public final class CachedChunkDebugOverlay implements GuiLayer {
     public static final byte STATE_RECEIVE_CHUNK = 1, STATE_RECEIVE_PRESHARED_CHUNK = 2;
 
@@ -100,8 +101,8 @@ public final class CachedChunkDebugOverlay implements GuiLayer {
         graphics.fill(xStart - CELL_GAP, yStart - CELL_GAP, graphics.guiWidth(), graphics.guiHeight(), 0xC0000000);
 
         ChunkPos chunkPos = minecraft.player.chunkPosition();
-        for (int x0 = chunkPos.x() - chunkRadius, x = x0; x < viewRange + chunkRadius; x++) {
-            for (int z0 = chunkPos.z() - chunkRadius, z = z0; z < viewRange + chunkRadius; z++) {
+        for (int x0 = chunkPos.x() - chunkRadius, x = x0; x < chunkPos.x() + chunkRadius; x++) {
+            for (int z0 = chunkPos.z() - chunkRadius, z = z0; z < chunkPos.z() + chunkRadius; z++) {
                 int color = computeColor(x, z, viewCenterX, viewCenterZ, chunks, viewRange);
                 if (color != 0) {
                     int xCellStart = xStart + (x - x0) * CELL_STEP;

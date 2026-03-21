@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableSet;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.PacketType;
 import net.minecraft.resources.Identifier;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.players.PlayerList;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -129,8 +130,11 @@ public final class NEBConfigs {
     }
 
     private static void updateViewDistance() {
-        PlayerList playerList = Objects.requireNonNull(ServerLifecycleHooks.getCurrentServer()).getPlayerList();
-        playerList.setViewDistance(playerList.getViewDistance() + CHUNK_CACHE_DISTANCE.get());
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        if (server != null) {
+            PlayerList playerList = Objects.requireNonNull(server).getPlayerList();
+            playerList.setViewDistance(playerList.getViewDistance() + CHUNK_CACHE_DISTANCE.get());
+        }
     }
 
     @Nullable
