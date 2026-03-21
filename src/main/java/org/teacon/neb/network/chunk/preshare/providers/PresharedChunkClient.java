@@ -14,7 +14,7 @@ import java.util.UUID;
 
 @EventBusSubscriber(Dist.CLIENT)
 public class PresharedChunkClient {
-    public static volatile PresharedChunkBundle lookup = PresharedChunkBundle.EMPTY;
+    public static volatile PresharedChunkBundle lookup = PresharedChunkBundle.NOT_LOADED;
 
     public static UUID readVersion() {
         try {
@@ -31,7 +31,7 @@ public class PresharedChunkClient {
 
     @SubscribeEvent
     private static void on(ClientPlayerNetworkEvent.LoggingOut event) {
-        lookup = PresharedChunkBundle.EMPTY;
+        lookup = PresharedChunkBundle.NOT_LOADED;
     }
 
     private static Path getBundlePath() {

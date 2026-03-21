@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableSet;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.PacketType;
 import net.minecraft.resources.Identifier;
+import net.minecraft.server.players.PlayerList;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -14,6 +15,7 @@ import net.neoforged.fml.event.lifecycle.FMLConstructModEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.common.ModConfigSpec;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import org.jetbrains.annotations.Nullable;
 import org.teacon.neb.network.NetworkManager;
 
@@ -117,11 +119,18 @@ public final class NEBConfigs {
     @SubscribeEvent
     private static void on(ModConfigEvent.Loading event) {
         updateUserBlacklist(event.getConfig().getSpec());
+        updateViewDistance();
     }
 
     @SubscribeEvent
     private static void on(ModConfigEvent.Reloading event) {
         updateUserBlacklist(event.getConfig().getSpec());
+        updateViewDistance();
+    }
+
+    private static void updateViewDistance() {
+        PlayerList playerList = Objects.requireNonNull(ServerLifecycleHooks.getCurrentServer()).getPlayerList();
+        playerList.setViewDistance(playerList.getViewDistance() + CHUNK_CACHE_DISTANCE.get());
     }
 
     @Nullable
@@ -142,16 +151,18 @@ public final class NEBConfigs {
     }
 
     /// Set the following user black list to make NEB compatible with Velocity.
-    /// - s2c@minecraft:login
-    /// - c2s@minecraft:keep_alive
-    /// - s2c@minecraft:keep_alive
-    /// - s2c@minecraft:command_suggestions
-    /// - s2c@minecraft:commands
-    /// - c2s@minecraft:chat_command
-    /// - c2s@minecraft:client_command
-    /// - c2s@minecraft:command_suggestion
-    /// - s2c@minecraft:player_info_remove
-    /// - s2c@minecraft:player_info_update
+    /// ```
+    /// s2c@minecraft:login
+    /// c2s@minecraft:keep_alive
+    /// s2c@minecraft:keep_alive
+    /// s2c@minecraft:command_suggestions
+    /// s2c@minecraft:commands
+    /// c2s@minecraft:chat_command
+    /// c2s@minecraft:client_command
+    /// c2s@minecraft:command_suggestion
+    /// s2c@minecraft:player_info_remove
+    /// s2c@minecraft:player_info_update
+    /// ```
     private static void updateUserBlacklist(IConfigSpec spec) {
         if (spec == CONFIG_SPEC) {
             NetworkManager.USER_BLACK_LIST = ImmutableSet.copyOf(

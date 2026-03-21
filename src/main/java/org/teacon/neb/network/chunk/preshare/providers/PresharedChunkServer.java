@@ -39,7 +39,7 @@ import java.util.function.Consumer;
 public class PresharedChunkServer {
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    public static volatile PresharedChunkBundle lookup = PresharedChunkBundle.EMPTY;
+    public static volatile PresharedChunkBundle lookup = PresharedChunkBundle.NOT_LOADED;
 
     @SubscribeEvent
     private static void on(ServerStartedEvent event) throws IOException {
@@ -118,6 +118,6 @@ public class PresharedChunkServer {
     }
 
     public static void unload() {
-        lookup = PresharedChunkBundle.EMPTY;
+        lookup = PresharedChunkBundle.NOT_LOADED;
     }
 }

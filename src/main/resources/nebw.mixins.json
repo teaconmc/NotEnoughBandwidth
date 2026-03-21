@@ -6,13 +6,18 @@
   "refmap": "nebw.refmap.json",
   "mixins": [
     "ChunkMapMixin",
+    "ClientPacketListenerMixin",
     "ConnectionMixin",
     "CustomPayloadPacketMixin",
     "GameProtocolsMixin",
     "PacketDecoderMixin",
     "PlayerChunkSenderMixin",
+    "PlayerListMixin",
     "ProtocolSwapHandlerMixin",
     "nf.NetworkRegistryMixin"
+  ],
+  "client": [
+    "LevelRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 1

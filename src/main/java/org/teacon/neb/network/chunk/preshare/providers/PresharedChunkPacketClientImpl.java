@@ -1,6 +1,8 @@
 package org.teacon.neb.network.chunk.preshare.providers;
 
 import com.google.common.collect.ImmutableMap;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkPacketData;
@@ -15,7 +17,11 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
+import net.neoforged.neoforge.network.registration.HandlerThread;
+import org.teacon.neb.network.chunk.cache.CachedChunkDebugOverlay;
 import org.teacon.neb.network.chunk.preshare.PresharedChunk;
+import org.teacon.neb.network.chunk.preshare.PresharedChunkBundle;
 import org.teacon.neb.network.chunk.preshare.PresharedChunkGuardPacket;
 import org.teacon.neb.network.chunk.preshare.PresharedChunkPacket;
 import org.teacon.neb.network.chunk.preshare.data.BlockEntityInfo;
@@ -26,11 +32,14 @@ import org.teacon.neb.utils.vm.LookupAccess;
 import org.teacon.neb.utils.vm.VectorSupport;
 
 import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @EventBusSubscriber(value = Dist.CLIENT)
@@ -75,23 +84,33 @@ public class PresharedChunkPacketClientImpl {
         }
     }
 
+    private static final VarHandle PLAYER;
+    
+    static {
+        try {
+            PLAYER = MethodHandles.lookup().findVarHandle(Minecraft.class, "player", LocalPlayer.class);
+        } catch (ReflectiveOperationException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
+
     @SubscribeEvent
     private static void on(RegisterClientPayloadHandlersEvent event) {
-        event.register(PresharedChunkPacket.TYPE, (packet, listener) -> {
+        event.register(PresharedChunkPacket.TYPE, HandlerThread.NETWORK, (packet, listener) -> {
             // FIXME: listener.player() will read non-volatile field Minecraft#player, causing thread visibility
             //        problems if this packet is handled on network threads. However, PresharedChunkPacket#apply
             //        involves complex packet transform codes, which may cause performance issues.
-            PresharedChunk preshared = PresharedChunkClient.lookup.getChunk(listener.player().level(), packet.pos());
-            if (preshared == null) {
-                throw new IllegalStateException("Receiving unknown preshared-chunks.");
+            LocalPlayer player = (LocalPlayer) PLAYER.get(Minecraft.getInstance());
+            if (player == null) {
+                player = (LocalPlayer) PLAYER.getAcquire(Minecraft.getInstance());
             }
 
-            ProfilerFiller profiler = Profiler.get();
-            profiler.push("regenerateVanillaLCWLP");
-            ClientboundLevelChunkWithLightPacket pkt = apply(packet, preshared);
-            profiler.pop();
-
-            listener.enqueueWork(() -> listener.handle(pkt));
+            PresharedChunkBundle lookup = PresharedChunkClient.lookup;
+            if (player != null && lookup != PresharedChunkBundle.NOT_LOADED) {
+                handle(lookup, packet, listener, player);
+            } else {
+                listener.enqueueWork(() -> handle(PresharedChunkClient.lookup, packet, listener, Objects.requireNonNull(Minecraft.getInstance().player)));
+            }
         });
 
         event.register(PresharedChunkGuardPacket.TYPE, (packet, listener) -> {
@@ -99,6 +118,24 @@ public class PresharedChunkPacketClientImpl {
             if (!remoteVersion.equals(localVersion)) {
                 listener.disconnect(Component.translatable("neb.preshared.version_mismatch", remoteVersion.toString(), localVersion.toString()));
             }
+        });
+    }
+
+    private static void handle(PresharedChunkBundle bundle, PresharedChunkPacket packet, IPayloadContext listener, LocalPlayer player) {
+        PresharedChunk preshared = bundle.getChunk(player.level(), packet.pos());
+        if (preshared == null) {
+            throw new IllegalStateException("Receiving unknown preshared-chunks.");
+        }
+
+        ProfilerFiller profiler = Profiler.get();
+        profiler.push("regenerateVanillaLCWLP");
+        ClientboundLevelChunkWithLightPacket pkt = apply(packet, preshared);
+        profiler.pop();
+
+        listener.enqueueWork(() -> {
+            long state = CachedChunkDebugOverlay.encodeState(CachedChunkDebugOverlay.STATE_RECEIVE_PRESHARED_CHUNK);
+            CachedChunkDebugOverlay.states.put(ChunkPos.pack(pkt.getX(), pkt.getZ()), state);
+            listener.handle(pkt);
         });
     }
 

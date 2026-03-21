@@ -51,17 +51,19 @@ public final class PresharedChunkBundle {
     }
 
     public @Nullable PresharedChunk getChunk(Level level, ChunkPos pos) {
-        return level.dimension() == Level.OVERWORLD ? chunks.get(pos.pack()) : null;
+        if (level.dimension() == Level.OVERWORLD) {
+            return chunks.get(pos.pack());
+        }
+        return null;
     }
 
-    public static final PresharedChunkBundle EMPTY = new PresharedChunkBundle(
-            UUID.fromString("2d924004-4f5c-43ba-835c-bff6d6831fd2"),
-            Long2ObjectMaps.emptyMap()
-    );
+    public static final PresharedChunkBundle NOT_LOADED = new PresharedChunkBundle(UUID.fromString("2d924004-4f5c-43ba-835c-bff6d6831fd2"), Long2ObjectMaps.emptyMap());
+
+    public static final PresharedChunkBundle DEFAULT_EMPTY = new PresharedChunkBundle(UUID.fromString("788a827e-9794-4b90-99c7-e6be25dbee6c"), Long2ObjectMaps.emptyMap());
 
     public static PresharedChunkBundle load(Path path, RegistryAccess registryAccess) throws IOException {
         if (!Files.exists(path)) {
-            return EMPTY;
+            return DEFAULT_EMPTY;
         }
 
         ByteBuf input = Unpooled.directBuffer();
@@ -80,7 +82,7 @@ public final class PresharedChunkBundle {
 
     public static UUID loadVersion(Path path) throws IOException {
         if (!Files.exists(path)) {
-            return EMPTY.version;
+            return NOT_LOADED.version;
         }
 
         byte[] buffer;
