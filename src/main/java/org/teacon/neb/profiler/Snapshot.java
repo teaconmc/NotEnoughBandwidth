@@ -11,6 +11,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.NotNull;
+import org.teacon.neb.network.TypedPacket;
 import org.teacon.neb.network.VanillaCustomPayload;
 import org.teacon.neb.network.indexed.IndexPacket;
 
@@ -38,13 +39,15 @@ public final class Snapshot implements Iterable<Object2LongMap.Entry<String>> {
         String type = switch (packet) {
             case VanillaCustomPayload payload -> payload.payload().type().id().toString();
 
-            case IndexPacket(PacketType<IndexPacket> ignored, CustomPacketPayload payload) ->
+            case TypedPacket(Packet<?> _, String packetType) -> packetType;
+
+            case IndexPacket(PacketType<IndexPacket> _, CustomPacketPayload payload) ->
                     payload.type().id().toString();
 
             case ClientboundBlockEntityDataPacket entityData -> {
                 Identifier location = BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(entityData.getType());
                 if (location != null) {
-                    yield packetID + "#" + location;
+                    yield packetID + "[type=" + location + "]";
                 } else {
                     yield packetID.toString();
                 }

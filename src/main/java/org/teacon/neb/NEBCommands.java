@@ -126,8 +126,7 @@ public class NEBCommands {
 
     @SubscribeEvent
     private static void on(RegisterCommandsEvent event) {
-        event.getDispatcher().register(
-                Commands.literal("neb")
+        event.getDispatcher().register(Commands.literal("teacon").then(Commands.literal("neb")
                         .then(Commands.literal("preshared")
                                 .requires(source -> {
                                     if (source.source instanceof MinecraftServer) {
@@ -174,7 +173,7 @@ public class NEBCommands {
                                     return Command.SINGLE_SUCCESS;
                                 }))
                         )
-        );
+        ));
     }
 
     private static int onReloadPresharedChunks(CommandContext<CommandSourceStack> context, boolean load) {
@@ -245,20 +244,19 @@ public class NEBCommands {
 
         @SubscribeEvent
         private static void on(RegisterClientCommandsEvent event) {
-            event.getDispatcher().register(
-                    Commands.literal("neb")
-                            .then(Commands.literal("profilerc")
-                                    .then(Commands.literal("start").executes(context -> {
-                                        saveResult(ProfilerChannel.CLIENT.add(new SimpleProfiler()));
-                                        Minecraft.getInstance().getChatListener().handleSystemMessage(Component.translatable("neb.profiler.client.start"), false);
-                                        return Command.SINGLE_SUCCESS;
-                                    }))
-                                    .then(Commands.literal("stop").executes(context -> {
-                                        saveResult(ProfilerChannel.CLIENT.take(SimpleProfiler.class));
-                                        return Command.SINGLE_SUCCESS;
-                                    }))
-                            )
-            );
+            event.getDispatcher().register(Commands.literal("teacon").then(Commands.literal("neb")
+                    .then(Commands.literal("profilerc")
+                            .then(Commands.literal("start").executes(context -> {
+                                saveResult(ProfilerChannel.CLIENT.add(new SimpleProfiler()));
+                                Minecraft.getInstance().getChatListener().handleSystemMessage(Component.translatable("neb.profiler.client.start"), false);
+                                return Command.SINGLE_SUCCESS;
+                            }))
+                            .then(Commands.literal("stop").executes(context -> {
+                                saveResult(ProfilerChannel.CLIENT.take(SimpleProfiler.class));
+                                return Command.SINGLE_SUCCESS;
+                            }))
+                    )
+            ));
         }
 
         @SubscribeEvent

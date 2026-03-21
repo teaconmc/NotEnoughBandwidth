@@ -14,6 +14,7 @@
     "PlayerChunkSenderMixin",
     "PlayerListMixin",
     "ProtocolSwapHandlerMixin",
+    "ChunkMap_TrackedEntityMixin",
     "nf.NetworkRegistryMixin"
   ],
   "client": [

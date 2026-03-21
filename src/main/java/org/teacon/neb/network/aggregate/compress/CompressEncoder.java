@@ -10,6 +10,7 @@ import net.minecraft.network.VarInt;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketType;
 import org.teacon.neb.NotEnoughBandwidth;
+import org.teacon.neb.network.TypedPacket;
 import org.teacon.neb.network.aggregate.CompressedPacket;
 import org.teacon.neb.profiler.ProfilerChannel;
 import org.teacon.neb.profiler.Snapshot;
@@ -57,7 +58,8 @@ public final class CompressEncoder extends MessageToMessageEncoder<CompressEncod
         for (Packet<?> packet : transfer.packets()) {
             ByteBuf t = temp.duplicate();
             try {
-                ENCODE.invokeExact(encoder, context, packet, t);
+                Packet<?> inner = packet instanceof TypedPacket<?> tp ? tp.packet() : packet;
+                ENCODE.invokeExact(encoder, context, inner, t);
             } catch (Throwable t2) {
                 throw t2 instanceof RuntimeException re ? re : new RuntimeException(t2);
             }
