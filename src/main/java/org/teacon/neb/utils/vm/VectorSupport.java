@@ -88,9 +88,7 @@ public final class VectorSupport {
         }
     }
 
-    private record Context(
-            Class<?> fallback, @Nullable Class<?> vectorized
-    ) {
+    private record Context(Class<?> fallback, @Nullable Class<?> vectorized) {
         private static final Logger LOGGER = LogUtils.getLogger();
 
         public static Context create() throws ReflectiveOperationException {
@@ -98,23 +96,20 @@ public final class VectorSupport {
 
             Class<?> vectorized = null;
             try {
-                try {
-                    Class.forName("jdk.incubator.vector.Vector");
-                } catch (ClassNotFoundException _) {
-                    MethodHandle loadModule = LookupAccess.IMPL_LOOKUP.findStatic(
-                            Class.forName("jdk.internal.module.Modules"),
-                            "loadModule",
-                            MethodType.methodType(Module.class, String.class)
-                    );
-                    MethodHandle addReads = LookupAccess.IMPL_LOOKUP.findStatic(
-                            Class.forName("jdk.internal.module.Modules"),
-                            "addReads",
-                            MethodType.methodType(void.class, Module.class, Module.class)
-                    );
+                MethodHandle loadModule = LookupAccess.IMPL_LOOKUP.findStatic(
+                        Class.forName("jdk.internal.module.Modules"),
+                        "loadModule",
+                        MethodType.methodType(Module.class, String.class)
+                );
+                Module vector = (Module) loadModule.invokeExact("jdk.incubator.vector");
 
-                    Module vector = (Module) loadModule.invokeExact("jdk.incubator.vector");
-                    addReads.invokeExact(VectorSupport.class.getModule(), vector);
-                }
+                MethodHandle addReads = LookupAccess.IMPL_LOOKUP.findStatic(
+                        Class.forName("jdk.internal.module.Modules"),
+                        "addReads",
+                        MethodType.methodType(void.class, Module.class, Module.class)
+                );
+
+                addReads.invokeExact(VectorSupport.class.getModule(), vector);
 
                 vectorized = Class.forName(VectorSupport.class.getName() + "$Vectorized");
                 LOGGER.warn("Using incubating Vector API to accelerate path calculation.");
@@ -195,8 +190,7 @@ public final class VectorSupport {
 
         public static void xor(byte[] array1, int index1, byte[] array2, int index2, byte[] out, int index3, int length) {
             int i = 0;
-            if ((index1 & 7) == 0 && (index2 & 7) == 0 && (index3 & 7) == 0) {
-                // Fast path for aligned access.
+            if ((index1 & 7) == 0 && (index2 & 7) == 0 && (index3 & 7) == 0) { // Fast path for aligned access.
                 for (int bound = length & 7; i < bound; i++) {
                     long v1 = (long) B_J.get(array1, index1 + i);
                     long v2 = (long) B_J.get(array2, index2 + i);

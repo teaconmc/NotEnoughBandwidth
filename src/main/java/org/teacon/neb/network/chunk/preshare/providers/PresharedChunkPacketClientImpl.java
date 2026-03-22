@@ -106,7 +106,7 @@ public class PresharedChunkPacketClientImpl {
             }
 
             PresharedChunkBundle lookup = PresharedChunkClient.lookup;
-            if (player != null && lookup != PresharedChunkBundle.NOT_LOADED) {
+            if (player != null && lookup != PresharedChunkBundle.EMPTY) {
                 handle(lookup, packet, listener, player);
             } else {
                 listener.enqueueWork(() -> handle(PresharedChunkClient.lookup, packet, listener, Objects.requireNonNull(Minecraft.getInstance().player)));
@@ -116,7 +116,12 @@ public class PresharedChunkPacketClientImpl {
         event.register(PresharedChunkGuardPacket.TYPE, (packet, listener) -> {
             UUID remoteVersion = packet.version(), localVersion = PresharedChunkClient.readVersion();
             if (!remoteVersion.equals(localVersion)) {
-                listener.disconnect(Component.translatable("neb.preshared.version_mismatch", remoteVersion.toString(), localVersion.toString()));
+                UUID emptyVersion = PresharedChunkBundle.EMPTY.getVersion();
+                listener.disconnect(Component.translatable(
+                        "neb.preshared.version_mismatch",
+                        remoteVersion.equals(emptyVersion) ? "<empty>" : remoteVersion.toString(),
+                        localVersion.equals(emptyVersion) ? "<empty>" : localVersion.toString()
+                ));
             }
         });
     }

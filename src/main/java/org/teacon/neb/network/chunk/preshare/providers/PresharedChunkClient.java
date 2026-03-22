@@ -1,6 +1,7 @@
 package org.teacon.neb.network.chunk.preshare.providers;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.RegistryAccess;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -14,7 +15,7 @@ import java.util.UUID;
 
 @EventBusSubscriber(Dist.CLIENT)
 public class PresharedChunkClient {
-    public static volatile PresharedChunkBundle lookup = PresharedChunkBundle.NOT_LOADED;
+    public static volatile PresharedChunkBundle lookup = PresharedChunkBundle.EMPTY;
 
     public static UUID readVersion() {
         try {
@@ -24,14 +25,13 @@ public class PresharedChunkClient {
         }
     }
 
-    @SubscribeEvent
-    private static void on(ClientPlayerNetworkEvent.LoggingIn event) throws IOException {
-        lookup = PresharedChunkBundle.load(getBundlePath(), event.getPlayer().registryAccess());
+    public static void load(RegistryAccess registryAccess) throws IOException {
+        lookup = PresharedChunkBundle.load(getBundlePath(), registryAccess);
     }
 
     @SubscribeEvent
     private static void on(ClientPlayerNetworkEvent.LoggingOut event) {
-        lookup = PresharedChunkBundle.NOT_LOADED;
+        lookup = PresharedChunkBundle.EMPTY;
     }
 
     private static Path getBundlePath() {
