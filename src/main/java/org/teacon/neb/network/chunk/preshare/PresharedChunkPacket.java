@@ -48,8 +48,7 @@ public record PresharedChunkPacket(
                 int limit = source.writerIndex();
                 buffer.writeVarInt(limit);
 
-                for (int i = 0; i < limit; ) {
-                    int end;
+                for (int end, i = 0; i < limit; i = end) {
                     if (source.getByte(i) == 0) {
                         end = findNext(i + 1, source, false);
                         buffer.writeByte(0);
@@ -58,7 +57,6 @@ public record PresharedChunkPacket(
                         end = findNext(i + 1, source, true);
                         buffer.writeBytes(source, i, end - i);
                     }
-                    i = end;
                 }
             } finally {
                 source.release();
@@ -83,7 +81,10 @@ public record PresharedChunkPacket(
                     if (byteValue == 0) {
                         target.writeZero(buffer.readVarInt());
                     } else {
-                        target.writeByte(byteValue);
+                        int index = buffer.readerIndex();
+                        int end = findNext(index, buffer, true);
+                        target.writeBytes(buffer, index - 1, end - index + 1);
+                        buffer.readerIndex(end);
                     }
                 }
 
