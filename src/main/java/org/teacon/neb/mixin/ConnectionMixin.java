@@ -2,6 +2,7 @@ package org.teacon.neb.mixin;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelPipeline;
 import net.minecraft.network.BandwidthDebugMonitor;
@@ -14,14 +15,20 @@ import net.minecraft.network.UnconfiguredPipelineHandler;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketFlow;
 import org.jetbrains.annotations.Nullable;
+import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.teacon.neb.network.NetworkManager;
 import org.teacon.neb.network.aggregate.compress.CompressDecoder;
 import org.teacon.neb.network.aggregate.compress.CompressEncoder;
+
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 
 /**
  * @author USS_Shenzhou
@@ -85,5 +92,37 @@ public abstract class ConnectionMixin {
         return original.andThen(context -> {
             context.pipeline().addAfter("decoder", CompressDecoder.ID, CompressDecoder.INSTANCE);
         });
+    }
+
+    @Unique
+    private static final VarHandle nebw$CHANNEL;
+
+    static {
+        try {
+            nebw$CHANNEL = MethodHandles.lookup().findVarHandle(Connection.class, "channel", Channel.class);
+        } catch (ReflectiveOperationException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
+
+    @Redirect(method = "channelActive", at = @At(
+            value = "FIELD",
+            target = "Lnet/minecraft/network/Connection;channel:Lio/netty/channel/Channel;",
+            opcode = Opcodes.PUTFIELD
+    ))
+    private void publishChannel(Connection instance, Channel value) {
+        nebw$CHANNEL.setVolatile(instance, value);
+    }
+
+    @ModifyExpressionValue(method = "channel", at = @At(
+            value = "FIELD",
+            target = "Lnet/minecraft/network/Connection;channel:Lio/netty/channel/Channel;",
+            opcode = Opcodes.GETFIELD
+    ))
+    private Channel readChannel(Channel channel) {
+        if (channel == null) {
+            channel = (Channel) nebw$CHANNEL.getVolatile((Connection) (Object) this);
+        }
+        return channel;
     }
 }

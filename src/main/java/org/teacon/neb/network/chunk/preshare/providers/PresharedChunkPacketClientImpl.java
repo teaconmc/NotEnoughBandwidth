@@ -97,19 +97,20 @@ public class PresharedChunkPacketClientImpl {
     @SubscribeEvent
     private static void on(RegisterClientPayloadHandlersEvent event) {
         event.register(PresharedChunkPacket.TYPE, HandlerThread.NETWORK, (packet, listener) -> {
-            // FIXME: listener.player() will read non-volatile field Minecraft#player, causing thread visibility
-            //        problems if this packet is handled on network threads. However, PresharedChunkPacket#apply
-            //        involves complex packet transform codes, which may cause performance issues.
             LocalPlayer player = (LocalPlayer) PLAYER.get(Minecraft.getInstance());
             if (player == null) {
                 player = (LocalPlayer) PLAYER.getAcquire(Minecraft.getInstance());
             }
 
-            PresharedChunkBundle lookup = PresharedChunkClient.lookup;
-            if (player != null && lookup != PresharedChunkBundle.EMPTY) {
-                handle(lookup, packet, listener, player);
+            if (player != null) {
+                handle(packet, listener, player);
             } else {
-                listener.enqueueWork(() -> handle(PresharedChunkClient.lookup, packet, listener, Objects.requireNonNull(Minecraft.getInstance().player)));
+                listener.enqueueWork(() -> {
+                    ProfilerFiller profiler = Profiler.get();
+                    profiler.push("decodePresharedChunk");
+                    handle(packet, listener, Objects.requireNonNull(Minecraft.getInstance().player));
+                    profiler.pop();
+                });
             }
         });
 
@@ -126,17 +127,13 @@ public class PresharedChunkPacketClientImpl {
         });
     }
 
-    private static void handle(PresharedChunkBundle bundle, PresharedChunkPacket packet, IPayloadContext listener, LocalPlayer player) {
-        PresharedChunk preshared = bundle.getChunk(player.level(), packet.pos());
+    private static void handle(PresharedChunkPacket packet, IPayloadContext listener, LocalPlayer player) {
+        PresharedChunk preshared = PresharedChunkClient.lookup.getChunk(player.level(), packet.pos());
         if (preshared == null) {
             throw new IllegalStateException("Receiving unknown preshared-chunks.");
         }
 
-        ProfilerFiller profiler = Profiler.get();
-        profiler.push("regenerateVanillaLCWLP");
         ClientboundLevelChunkWithLightPacket pkt = apply(packet, preshared);
-        profiler.pop();
-
         listener.enqueueWork(() -> {
             listener.handle(pkt);
             CachedChunkDebugOverlay.mark(ChunkPos.pack(pkt.getX(), pkt.getZ()), CachedChunkDebugOverlay.STATE_RECEIVE_PRESHARED_CHUNK);

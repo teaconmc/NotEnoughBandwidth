@@ -26,7 +26,6 @@ public final class AggregateBuffer {
     private static final AttributeKey<AggregateBuffer> BUFFER = AttributeKey.valueOf(NotEnoughBandwidth.id("buffer").toString());
 
     private static Attribute<AggregateBuffer> accessAB(Connection connection) {
-        // FIXME: Reading non-volatile net.minecraft.network.Connection#channel may get unexpected NULL value.
         return connection.channel().attr(BUFFER);
     }
 
