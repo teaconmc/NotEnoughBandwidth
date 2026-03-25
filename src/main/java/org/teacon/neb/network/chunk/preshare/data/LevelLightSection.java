@@ -9,6 +9,7 @@ import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.lighting.LevelLightEngine;
+import net.neoforged.fml.loading.FMLEnvironment;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 import org.teacon.neb.utils.vm.VectorSupport;
@@ -42,11 +43,20 @@ public record LevelLightSection(
         return lights;
     }
 
+    private static final byte[] BYTES_2048 = new byte[2048];
+
     @Contract(value = "_, _, _, true -> !null")
     private static byte @Nullable [] createDataLayer(LevelLightEngine lightEngine, SectionPos pos, LightLayer type, boolean allocateNull) {
         DataLayer data = lightEngine.getLayerListener(type).getDataLayerData(pos);
         if (data == null) {
-            return allocateNull ? new byte[2048] : null;
+            if (allocateNull) {
+                if (!FMLEnvironment.isProduction() && !VectorSupport.isEmpty(BYTES_2048)) {
+                    throw new AssertionError("Cannot reuse BYTES_2048: it has been altered!");
+                }
+                return BYTES_2048;
+            } else {
+                return null;
+            }
         }
 
         byte[] val = data.getData();
