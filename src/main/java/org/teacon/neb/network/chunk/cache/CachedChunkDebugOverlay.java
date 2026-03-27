@@ -10,6 +10,8 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.debug.DebugEntryNoop;
 import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.profiling.Profiler;
+import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.api.distmarker.Dist;
@@ -88,6 +90,9 @@ public final class CachedChunkDebugOverlay implements GuiLayer {
             return;
         }
 
+        ProfilerFiller profiler = Profiler.get();
+        profiler.push("chunkDebugOverlay");
+
         Object storage = CCC_STORAGE.getVolatile(minecraft.level.getChunkSource());
 
         @SuppressWarnings("unchecked")
@@ -107,9 +112,14 @@ public final class CachedChunkDebugOverlay implements GuiLayer {
                     int xCellStart = xStart + (x - x0) * CELL_STEP;
                     int yCellStart = yStart + (z - z0) * CELL_STEP;
                     graphics.fill(xCellStart, yCellStart, xCellStart + CELL_SIZE, yCellStart + CELL_SIZE, color);
+
+                    if (!GuiGraphicsHandler.disableIntersectionChecks) {
+                        GuiGraphicsHandler.disableIntersectionChecks = true;
+                    }
                 }
             }
         }
+        GuiGraphicsHandler.disableIntersectionChecks = false;
 
         ObjectIterator<Long2LongMap.Entry> iterator = Long2LongMaps.fastIterator(states);
         while (iterator.hasNext()) {
@@ -118,6 +128,8 @@ public final class CachedChunkDebugOverlay implements GuiLayer {
                 iterator.remove();
             }
         }
+
+        profiler.pop();
     }
 
     private int computeColor(int x, int z, int viewCenterX, int viewCenterZ, AtomicReferenceArray<@Nullable LevelChunk> chunks, int viewRange) {

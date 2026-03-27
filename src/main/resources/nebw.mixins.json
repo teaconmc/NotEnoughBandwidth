@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_25",
   "refmap": "nebw.refmap.json",
   "mixins": [
+    "ChunkMap_TrackedEntityMixin",
     "ChunkMapMixin",
     "ClientPacketListenerMixin",
     "ConnectionMixin",
@@ -14,11 +15,10 @@
     "PlayerChunkSenderMixin",
     "PlayerListMixin",
     "ProtocolSwapHandlerMixin",
-    "ChunkMap_TrackedEntityMixin",
     "nf.NetworkRegistryMixin"
   ],
   "client": [
-    "LevelRendererMixin"
+    "GuiRenderStateMixin"
   ],
   "injectors": {
     "defaultRequire": 1

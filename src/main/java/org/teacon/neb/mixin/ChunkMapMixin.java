@@ -10,6 +10,7 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.teacon.neb.network.chunk.cache.CachedChunkTrackingView;
 
 @Mixin(ChunkMap.class)
@@ -20,6 +21,9 @@ public abstract class ChunkMapMixin {
     @Shadow
     @Final
     private ServerLevel level;
+
+    @Unique
+    private static TicketType TICKET_TYPE;
 
     /**
      * @author Burning_TNT
@@ -44,10 +48,11 @@ public abstract class ChunkMapMixin {
 
             @Override
             public void putTicket(ChunkPos pos, int ticks) {
-                ticketStorage.addTicketWithRadius(
-                        new TicketType(ticks, TicketType.FLAG_LOADING | TicketType.FLAG_SIMULATION | TicketType.FLAG_CAN_EXPIRE_IF_UNLOADED),
-                        pos, 1
-                );
+                TicketType ticketType = TICKET_TYPE;
+                if (ticketType == null || ticketType.timeout() != ticks) {
+                    ticketType = TICKET_TYPE = new TicketType(ticks, TicketType.FLAG_LOADING | TicketType.FLAG_SIMULATION | TicketType.FLAG_CAN_EXPIRE_IF_UNLOADED);
+                }
+                ticketStorage.addTicketWithRadius(ticketType, pos, 1);
             }
         });
     }
