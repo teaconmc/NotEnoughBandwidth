@@ -22,8 +22,8 @@ import org.intellij.lang.annotations.MagicConstant;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.teacon.neb.NotEnoughBandwidth;
+import org.teacon.neb.utils.vm.LookupAccess;
 
-import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
@@ -66,13 +66,12 @@ public final class CachedChunkDebugOverlay implements GuiLayer {
         try {
             Class<?> storage = Class.forName("net.minecraft.client.multiplayer.ClientChunkCache$Storage");
 
-            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(ClientChunkCache.class, MethodHandles.lookup());
-            CCC_STORAGE = lookup.findVarHandle(ClientChunkCache.class, "storage", storage);
+            CCC_STORAGE = LookupAccess.IMPL_LOOKUP.findVarHandle(ClientChunkCache.class, "storage", storage);
 
-            CCC_STORAGE_CHUNKS = lookup.findVarHandle(storage, "chunks", AtomicReferenceArray.class);
-            CCC_STORAGE_VCX = lookup.findVarHandle(storage, "viewCenterX", int.class);
-            CCC_STORAGE_VCZ = lookup.findVarHandle(storage, "viewCenterZ", int.class);
-            CCC_STORAGE_CR = lookup.findVarHandle(storage, "chunkRadius", int.class);
+            CCC_STORAGE_CHUNKS = LookupAccess.IMPL_LOOKUP.findVarHandle(storage, "chunks", AtomicReferenceArray.class);
+            CCC_STORAGE_VCX = LookupAccess.IMPL_LOOKUP.findVarHandle(storage, "viewCenterX", int.class);
+            CCC_STORAGE_VCZ = LookupAccess.IMPL_LOOKUP.findVarHandle(storage, "viewCenterZ", int.class);
+            CCC_STORAGE_CR = LookupAccess.IMPL_LOOKUP.findVarHandle(storage, "chunkRadius", int.class);
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
         }

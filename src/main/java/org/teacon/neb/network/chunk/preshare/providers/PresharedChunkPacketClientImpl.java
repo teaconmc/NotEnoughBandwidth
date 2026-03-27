@@ -32,7 +32,6 @@ import org.teacon.neb.utils.vm.LookupAccess;
 import org.teacon.neb.utils.vm.VectorSupport;
 
 import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
@@ -45,6 +44,8 @@ import java.util.UUID;
 @EventBusSubscriber(Dist.CLIENT)
 public class PresharedChunkPacketClientImpl {
     private static final MethodHandle CLCPD_NEW, CLCPD_BEI_NEW, CLUPD_NEW, CLCWLP_NEW;
+
+    private static final VarHandle PLAYER;
 
     static {
         try {
@@ -79,16 +80,8 @@ public class PresharedChunkPacketClientImpl {
                     "chunkData", ClientboundLevelChunkPacketData.class,
                     "lightData", ClientboundLightUpdatePacketData.class
             ));
-        } catch (ReflectiveOperationException e) {
-            throw new ExceptionInInitializerError(e);
-        }
-    }
 
-    private static final VarHandle PLAYER;
-    
-    static {
-        try {
-            PLAYER = MethodHandles.lookup().findVarHandle(Minecraft.class, "player", LocalPlayer.class);
+            PLAYER = LookupAccess.IMPL_LOOKUP.findVarHandle(Minecraft.class, "player", LocalPlayer.class);
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
         }

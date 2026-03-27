@@ -26,8 +26,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.teacon.neb.network.NetworkManager;
 import org.teacon.neb.network.aggregate.compress.CompressDecoder;
 import org.teacon.neb.network.aggregate.compress.CompressEncoder;
+import org.teacon.neb.utils.vm.LookupAccess;
 
-import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 
 /**
@@ -99,7 +99,7 @@ public abstract class ConnectionMixin {
 
     static {
         try {
-            nebw$CHANNEL = MethodHandles.lookup().findVarHandle(Connection.class, "channel", Channel.class);
+            nebw$CHANNEL = LookupAccess.IMPL_LOOKUP.findVarHandle(Connection.class, "channel", Channel.class);
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
         }
