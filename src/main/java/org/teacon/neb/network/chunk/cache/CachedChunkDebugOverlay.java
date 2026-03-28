@@ -112,14 +112,9 @@ public final class CachedChunkDebugOverlay implements GuiLayer {
                     int xCellStart = xStart + (x - x0) * CELL_STEP;
                     int yCellStart = yStart + (z - z0) * CELL_STEP;
                     graphics.fill(xCellStart, yCellStart, xCellStart + CELL_SIZE, yCellStart + CELL_SIZE, color);
-
-                    if (!GuiGraphicsHandler.disableIntersectionChecks) {
-                        GuiGraphicsHandler.disableIntersectionChecks = true;
-                    }
                 }
             }
         }
-        GuiGraphicsHandler.disableIntersectionChecks = false;
 
         ObjectIterator<Long2LongMap.Entry> iterator = Long2LongMaps.fastIterator(states);
         while (iterator.hasNext()) {

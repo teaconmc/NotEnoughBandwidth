@@ -17,9 +17,6 @@
     "ProtocolSwapHandlerMixin",
     "nf.NetworkRegistryMixin"
   ],
-  "client": [
-    "GuiRenderStateMixin"
-  ],
   "injectors": {
     "defaultRequire": 1
   }
