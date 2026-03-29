@@ -64,7 +64,7 @@ public final class VectorSupport {
         try {
             XOR_J.invokeExact(array1, index1, array2, index2, out, index3, length);
         } catch (Throwable e) {
-            throw new RuntimeException(e);
+            throw LookupAccess.raise(e);
         }
     }
 
@@ -76,7 +76,7 @@ public final class VectorSupport {
         try {
             XOR_Z.invokeExact(array1, index1, array2, index2, out, index3, length);
         } catch (Throwable e) {
-            throw new RuntimeException(e);
+            throw LookupAccess.raise(e);
         }
     }
 
@@ -84,7 +84,7 @@ public final class VectorSupport {
         try {
             return (boolean) NON_EMPTY_B.invokeExact(value);
         } catch (Throwable e) {
-            throw new RuntimeException(e);
+            throw LookupAccess.raise(e);
         }
     }
 
@@ -191,7 +191,7 @@ public final class VectorSupport {
         public static void xor(byte[] array1, int index1, byte[] array2, int index2, byte[] out, int index3, int length) {
             int i = 0;
             if ((index1 & 7) == 0 && (index2 & 7) == 0 && (index3 & 7) == 0) { // Fast path for aligned access.
-                for (int bound = length & 7; i < bound; i++) {
+                for (int bound = length & ~7; i < bound; i += 8) {
                     long v1 = (long) B_J.get(array1, index1 + i);
                     long v2 = (long) B_J.get(array2, index2 + i);
 

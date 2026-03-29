@@ -1,8 +1,8 @@
 package org.teacon.neb.network.chunk.preshare.data.palette;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.util.BitStorage;
 import net.minecraft.world.level.chunk.Configuration;
@@ -10,8 +10,11 @@ import net.minecraft.world.level.chunk.Palette;
 import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.chunk.PalettedContainerRO;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.teacon.neb.utils.vm.VectorSupport;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.locks.Lock;
 
 import static org.teacon.neb.network.chunk.preshare.data.palette.PaletteContainerAccess.allocateDataFrom;
@@ -23,18 +26,34 @@ import static org.teacon.neb.network.chunk.preshare.data.palette.PaletteContaine
 import static org.teacon.neb.network.chunk.preshare.data.palette.PaletteContainerAccess.setData;
 
 public record PalettedContainerChange<T>(byte bitsInMemory, byte bitsInStorage, byte[] palette, long[] data) {
-    private static final StreamCodec<FriendlyByteBuf, PalettedContainerChange<?>> STREAM_CODEC = StreamCodec.composite(
-            ByteBufCodecs.BYTE, PalettedContainerChange::bitsInMemory,
-            ByteBufCodecs.BYTE, PalettedContainerChange::bitsInStorage,
-            ByteBufCodecs.BYTE_ARRAY, PalettedContainerChange::palette,
-            ByteBufCodecs.LONG_ARRAY, PalettedContainerChange::data,
-            PalettedContainerChange::new
-    );
+    public static final StreamCodec<FriendlyByteBuf, List<PalettedContainerChange<?>>> STREAM_CODEC = new StreamCodec<>() {
+        @Override
+        public List<PalettedContainerChange<?>> decode(FriendlyByteBuf buffer) {
+            int count = buffer.readVarInt();
+            List<PalettedContainerChange<?>> values = new ArrayList<>(count);
 
-    @SuppressWarnings("unchecked")
-    public static <T> StreamCodec<FriendlyByteBuf, PalettedContainerChange<T>> getCodec() {
-        return (StreamCodec<FriendlyByteBuf, PalettedContainerChange<T>>) (Object) STREAM_CODEC;
-    }
+            ByteBuf bits = buffer.readSlice(count * 2);
+            for (int i = 0; i < count; i++) {
+                values.add(new PalettedContainerChange<>(
+                        bits.readByte(), bits.readByte(), buffer.readByteArray(), buffer.readLongArray()
+                ));
+            }
+            return values;
+        }
+
+        @Override
+        public void encode(FriendlyByteBuf buffer, List<PalettedContainerChange<?>> values) {
+            buffer.writeVarInt(values.size());
+            for (PalettedContainerChange<?> value : values) {
+                buffer.writeByte(value.bitsInMemory);
+                buffer.writeByte(value.bitsInStorage);
+            }
+            for (PalettedContainerChange<?> value : values) {
+                buffer.writeByteArray(value.palette);
+                buffer.writeLongArray(value.data);
+            }
+        }
+    };
 
     private static <T> PalettedContainerRO<T> copyResizeLossy(PalettedContainerRO<T> instance, int bits) {
         Object originalData = getData(instance);
@@ -67,21 +86,19 @@ public record PalettedContainerChange<T>(byte bitsInMemory, byte bitsInStorage, 
                 throw new AssertionError("Failed to resize PalettedContainer");
             }
 
-            byte[] paletteData;
-            FriendlyByteBuf paletteBuffer = new FriendlyByteBuf(Unpooled.directBuffer());
-            try {
-                getPalette(current).write(paletteBuffer, getStrategy(current).globalMap());
-
-                paletteData = new byte[paletteBuffer.readableBytes()];
-                paletteBuffer.readBytes(paletteData);
-            } finally {
-                paletteBuffer.release();
+            byte[] currentPaletteData = getPaletteData(current), basePaletteData = getPaletteData(base), palette;
+            if (currentPaletteData.length != basePaletteData.length) {
+                palette = currentPaletteData;
+            } else {
+                int length = currentPaletteData.length;
+                palette = new byte[length];
+                VectorSupport.xor(currentPaletteData, 0, basePaletteData, 0, palette, 0, length);
             }
 
             long[] arrayBase = baseStorage.getRaw(), arrayCurrent = currentStorage.getRaw();
             long[] result = new long[arrayBase.length];
             VectorSupport.xor(arrayBase, 0, arrayCurrent, 0, result, 0, arrayBase.length);
-            return new PalettedContainerChange<>((byte) baseConfiguration.bitsInMemory(), (byte) baseConfiguration.bitsInStorage(), paletteData, result);
+            return new PalettedContainerChange<>((byte) baseConfiguration.bitsInMemory(), (byte) baseConfiguration.bitsInStorage(), palette, result);
         } finally {
             lock.unlock();
         }
@@ -101,11 +118,34 @@ public record PalettedContainerChange<T>(byte bitsInMemory, byte bitsInStorage, 
                 throw new AssertionError("Failed to resize PalettedContainer");
             }
 
-            getPalette(current).read(new FriendlyByteBuf(Unpooled.wrappedBuffer(this.palette)), getStrategy(current).globalMap());
+            byte[] basePaletteData = getPaletteData(base), paletteData;
+            if (basePaletteData.length != this.palette.length) {
+                paletteData = this.palette;
+            } else {
+                int length = this.palette.length;
+                paletteData = new byte[length];
+                VectorSupport.xor(basePaletteData, 0, this.palette, 0, paletteData, 0, length);
+            }
+
+            getPalette(current).read(new FriendlyByteBuf(Unpooled.wrappedBuffer(paletteData)), getStrategy(current).globalMap());
             VectorSupport.xor(baseStorage.getRaw(), 0, this.data, 0, currentStorage.getRaw(), 0, currentStorage.getRaw().length);
             return current;
         } finally {
             lock.unlock();
         }
+    }
+
+    private static <T> byte @NonNull [] getPaletteData(PalettedContainerRO<T> current) {
+        byte[] paletteData;
+        FriendlyByteBuf paletteBuffer = new FriendlyByteBuf(Unpooled.directBuffer(1024));
+        try {
+            getPalette(current).write(paletteBuffer, getStrategy(current).globalMap());
+
+            paletteData = new byte[paletteBuffer.readableBytes()];
+            paletteBuffer.readBytes(paletteData);
+        } finally {
+            paletteBuffer.release();
+        }
+        return paletteData;
     }
 }

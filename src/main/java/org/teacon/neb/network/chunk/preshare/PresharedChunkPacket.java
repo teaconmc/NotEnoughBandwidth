@@ -33,7 +33,7 @@ public record PresharedChunkPacket(
         public static final StreamCodec<RegistryFriendlyByteBuf, PresharedChunkPacket> DELEGATE = StreamCodec.composite(
                 ChunkPos.STREAM_CODEC, PresharedChunkPacket::pos,
                 HeightMap.Diff.STREAM_CODEC, PresharedChunkPacket::heightmaps,
-                SectionInstance.Diff.STREAM_CODEC.apply(ByteBufCodecs.list()), PresharedChunkPacket::sections,
+                SectionInstance.Diff.STREAM_CODEC, PresharedChunkPacket::sections,
                 LevelLightSection.Diff.STREAM_CODEC.apply(ByteBufCodecs.list()), PresharedChunkPacket::lights,
                 BlockEntityInfo.Diff.STREAM_CODEC.apply(ByteBufCodecs.list()), PresharedChunkPacket::blockEntities,
                 PresharedChunkPacket::new

@@ -20,22 +20,28 @@ public record SectionInstance(
         LevelChunkSection chunk,
         Lock lock
 ) {
-    public static final StreamCodec<ContextByteBuf, SectionInstance> STREAM_CODEC = StreamCodec.composite(
-            new StreamCodec<>() {
-                @Override
-                public LevelChunkSection decode(ContextByteBuf buffer) {
-                    LevelChunkSection section = new LevelChunkSection(buffer.getPalettedContainerFactory());
-                    section.read(buffer);
-                    return section;
-                }
+    public static final StreamCodec<ContextByteBuf, List<SectionInstance>> STREAM_CODEC = new StreamCodec<>() {
+        @Override
+        public List<SectionInstance> decode(ContextByteBuf buffer) {
+            List<LevelChunkSection> sections = LevelChunkIO.read(buffer);
 
-                @Override
-                public void encode(ContextByteBuf buffer, LevelChunkSection value) {
-                    value.write(buffer);
-                }
-            }, SectionInstance::chunk,
-            chunk -> new SectionInstance(chunk, new ReentrantLock())
-    );
+            List<SectionInstance> value = new ArrayList<>(sections.size());
+            for (LevelChunkSection section : sections) {
+                value.add(new SectionInstance(section, new ReentrantLock()));
+            }
+            return value;
+        }
+
+        @Override
+        public void encode(ContextByteBuf buffer, List<SectionInstance> value) {
+            List<LevelChunkSection> sections = new ArrayList<>(value.size());
+            for (SectionInstance instance : value) {
+                sections.add(instance.chunk);
+            }
+
+            LevelChunkIO.write(buffer, sections);
+        }
+    };
 
     public static List<SectionInstance> createSectionsCache(LevelChunk chunk) {
         List<SectionInstance> sections = new ArrayList<>();
@@ -49,11 +55,40 @@ public record SectionInstance(
             PalettedContainerChange<BlockState> states,
             PalettedContainerChange<Holder<Biome>> biomes
     ) {
-        public static final StreamCodec<FriendlyByteBuf, Diff> STREAM_CODEC = StreamCodec.composite(
-                PalettedContainerChange.getCodec(), Diff::states,
-                PalettedContainerChange.getCodec(), Diff::biomes,
-                Diff::new
-        );
+        public static final StreamCodec<FriendlyByteBuf, List<Diff>> STREAM_CODEC = new StreamCodec<>() {
+            @Override
+            public List<Diff> decode(FriendlyByteBuf buffer) {
+                List<PalettedContainerChange<?>> values = PalettedContainerChange.STREAM_CODEC.decode(buffer);
+
+                int length = values.size();
+                if (length % 2 != 0) {
+                    throw new AssertionError("Invalid chunk diff: " + length);
+                }
+                List<Diff> diffs = new ArrayList<>(length / 2);
+                for (int i = 0; i < length / 2; i++) {
+                    diffs.add(new Diff(
+                            cast(values.get(i * 2)),
+                            cast(values.get(i * 2 + 1))
+                    ));
+                }
+                return diffs;
+            }
+
+            @Override
+            public void encode(FriendlyByteBuf buffer, List<Diff> diffs) {
+                List<PalettedContainerChange<?>> values = new ArrayList<>(diffs.size() * 2);
+                for (Diff diff : diffs) {
+                    values.add(diff.states);
+                    values.add(diff.biomes);
+                }
+                PalettedContainerChange.STREAM_CODEC.encode(buffer, values);
+            }
+
+            @SuppressWarnings("unchecked")
+            private static <T> PalettedContainerChange<T> cast(PalettedContainerChange<?> change) {
+                return (PalettedContainerChange<T>) change;
+            }
+        };
 
         public static List<Diff> from(List<SectionInstance> bases, LevelChunk chunk) {
             LevelChunkSection[] chunkSections = chunk.getSections();

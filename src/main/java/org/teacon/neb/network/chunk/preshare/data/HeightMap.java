@@ -2,7 +2,6 @@ package org.teacon.neb.network.chunk.preshare.data;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrays;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -23,12 +22,31 @@ public record HeightMap(
 
     private static final int SIZE = 37;
 
+    private static final int LENGTH = SIZE * TYPES.length;
+    
+    private static final StreamCodec<FriendlyByteBuf, long[]> FIXED_HEIGHTMAP_ARRAY = new StreamCodec<>() {
+        @Override
+        public long[] decode(FriendlyByteBuf buffer) {
+            long[] value = new long[LENGTH];
+            buffer.readFixedSizeLongArray(value);
+            return value;
+        }
+
+        @Override
+        public void encode(FriendlyByteBuf buffer, long[] value) {
+            if (value.length != LENGTH) {
+                throw new AssertionError("Invalid heightmap array: " + value.length);
+            }
+            buffer.writeFixedSizeLongArray(value);
+        }
+    };
+
     public static final StreamCodec<ContextByteBuf, HeightMap> STREAM_CODEC = StreamCodec.composite(
-            ByteBufCodecs.LONG_ARRAY, HeightMap::heightmap, HeightMap::new
+            FIXED_HEIGHTMAP_ARRAY, HeightMap::heightmap, HeightMap::new
     );
 
     public static HeightMap createCache(LevelChunk chunk) {
-        long[] data = new long[SIZE * TYPES.length];
+        long[] data = new long[LENGTH];
         for (Map.Entry<Heightmap.Types, Heightmap> entry : chunk.getHeightmaps()) {
             int i = ObjectArrays.binarySearch(HeightMap.TYPES, entry.getKey());
             if (i >= 0) {
@@ -44,11 +62,11 @@ public record HeightMap(
 
     public record Diff(long[] heightmap) {
         public static final StreamCodec<FriendlyByteBuf, Diff> STREAM_CODEC = StreamCodec.composite(
-                ByteBufCodecs.LONG_ARRAY, Diff::heightmap, Diff::new
+                FIXED_HEIGHTMAP_ARRAY, Diff::heightmap, Diff::new
         );
 
         public static Diff from(LevelChunk chunk, HeightMap base) {
-            if (base.heightmap.length != SIZE * TYPES.length) {
+            if (base.heightmap.length != LENGTH) {
                 throw new AssertionError(String.format("Invalid base, expecting %d * %d bytes, but found %d bytes.", SIZE, TYPES.length, base.heightmap.length));
             }
 
@@ -67,10 +85,10 @@ public record HeightMap(
         }
 
         public Map<Heightmap.Types, long[]> apply(HeightMap base) {
-            if (base.heightmap.length != SIZE * TYPES.length) {
+            if (base.heightmap.length != LENGTH) {
                 throw new AssertionError(String.format("Invalid base, expecting %d * %d bytes, but found %d bytes.", SIZE, TYPES.length, base.heightmap.length));
             }
-            if (heightmap.length != SIZE * TYPES.length) {
+            if (heightmap.length != LENGTH) {
                 throw new AssertionError(String.format("Invalid diff, expecting %d * %d bytes, but found %d bytes.", SIZE, TYPES.length, heightmap.length));
             }
 
