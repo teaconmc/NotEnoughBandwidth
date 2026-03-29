@@ -9,7 +9,6 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.UUIDUtil;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -76,19 +75,6 @@ public final class PresharedChunkBundle {
         } finally {
             input.release();
         }
-    }
-
-    public static UUID loadVersion(Path path) throws IOException {
-        if (!Files.exists(path)) {
-            return EMPTY.version;
-        }
-
-        byte[] buffer;
-        try (InputStream is = Files.newInputStream(path)) {
-            buffer = is.readNBytes(16);
-        }
-
-        return UUIDUtil.STREAM_CODEC.decode(Unpooled.wrappedBuffer(buffer));
     }
 
     public void write(Path path, RegistryAccess registryAccess) throws IOException {

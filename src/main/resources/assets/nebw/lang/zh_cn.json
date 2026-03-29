@@ -9,5 +9,5 @@
   "neb.preshared.create.failed": "无法创建预共享区块包，请查看日志获取详细信息。",
   "neb.preshared.create.success": "预共享区块包创建成功。使用“/teacon neb preshared reload”进行热切换。",
   "neb.preshared.create.connect_again": "服务器管理员已热切换预共享区块包，请重新连接服务器。",
-  "neb.preshared.version_mismatch": "预共享区块包无效。远程版本：%1$s，本地版本：%2$s"
+  "neb.preshared.bundle_missing": "缺少预共享区块包 %1$s，请联系服务器管理员获取帮助！"
 }

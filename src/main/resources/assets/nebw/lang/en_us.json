@@ -9,5 +9,5 @@
   "neb.preshared.create.failed": "Failed to create Preshared Chunk Bundle. Check the logs for details.",
   "neb.preshared.create.success": "Preshared Chunk Bundle created successfully. Use '/teacon neb preshared reload' to hot-swap it.",
   "neb.preshared.create.connect_again": "The server administrator has hot-swapped the Preshared Chunk Bundle. Please reconnect.",
-  "neb.preshared.version_mismatch": "Invalid Preshared Chunk Bundle. Remote version: %1$s, Local version: %2$s"
+  "neb.preshared.bundle_missing": "Missing Preshared Chunk Bundle %1$s. Contact server administrators!"
 }

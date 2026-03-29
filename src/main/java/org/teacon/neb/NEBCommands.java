@@ -127,56 +127,66 @@ public class NEBCommands {
     @SubscribeEvent
     private static void on(RegisterCommandsEvent event) {
         event.getDispatcher().register(Commands.literal("teacon").then(Commands.literal("neb")
-                        .then(Commands.literal("preshared")
-                                .requires(source -> {
-                                    if (source.source instanceof MinecraftServer) {
-                                        return true;
-                                    }
-                                    if (!FMLEnvironment.isProduction()) {
-                                        ServerPlayer player = PlayerCommandSourceAccessor.from(source.source);
-                                        if (player != null) {
-                                            return source.getServer().isSingleplayerOwner(player.nameAndId());
-                                        }
-                                    }
-                                    return false;
-                                })
-                                .then(Commands.literal("create")
-                                        .then(Commands.argument("path", StringArgumentType.greedyString())
-                                                .executes(context -> {
-                                                    MinecraftServer server = context.getSource().getServer();
-
-                                                    PresharedChunkServer.create(server, Path.of(context.getArgument("path", String.class)))
-                                                            .whenCompleteAsync((_, exception) -> {
-                                                                if (exception == null) {
-                                                                    context.getSource().sendSystemMessage(Component.translatable("neb.preshared.create.success"));
-                                                                } else {
-                                                                    context.getSource().sendSystemMessage(Component.translatable("neb.preshared.create.failed"));
-                                                                }
-                                                            }, server);
-
-                                                    return Command.SINGLE_SUCCESS;
-                                                })
-                                        )
+                .then(Commands.literal("preshared")
+                        .requires(source -> {
+                            if (source.source instanceof MinecraftServer) {
+                                return true;
+                            }
+                            if (!FMLEnvironment.isProduction()) {
+                                ServerPlayer player = PlayerCommandSourceAccessor.from(source.source);
+                                if (player != null) {
+                                    return source.getServer().isSingleplayerOwner(player.nameAndId());
+                                }
+                            }
+                            return false;
+                        })
+                        .then(Commands.literal("create")
+                                .then(Commands.argument("path", StringArgumentType.greedyString())
+                                        .executes(context -> {
+                                            createPresharedChunkBundle(context, Path.of(context.getArgument("path", String.class)));
+                                            return Command.SINGLE_SUCCESS;
+                                        })
                                 )
-                                .then(Commands.literal("reload").executes(context -> onReloadPresharedChunks(context, true)))
-                                .then(Commands.literal("unload").executes(context -> onReloadPresharedChunks(context, false)))
-                        )
-                        .then(Commands.literal("profiler")
-                                .requires(NEBCommands::checkAdministrator)
-                                .then(Commands.literal("start").executes(context -> {
-                                    sendResult(context, ProfilerChannel.SERVER.add(new SimpleProfiler()));
-                                    context.getSource().sendSystemMessage(Component.translatable("neb.profiler.server.start"));
+                                .executes(context -> {
+                                    createPresharedChunkBundle(context, null);
                                     return Command.SINGLE_SUCCESS;
-                                }))
-                                .then(Commands.literal("stop").executes(context -> {
-                                    sendResult(context, ProfilerChannel.SERVER.take(SimpleProfiler.class));
-                                    return Command.SINGLE_SUCCESS;
-                                }))
+                                })
                         )
+                        .then(Commands.literal("reload").executes(context -> reloadPresharedChunks(context, true)))
+                        .then(Commands.literal("unload").executes(context -> reloadPresharedChunks(context, false)))
+                )
+                .then(Commands.literal("profiler")
+                        .requires(NEBCommands::checkAdministrator)
+                        .then(Commands.literal("start").executes(context -> {
+                            sendResult(context, ProfilerChannel.SERVER.add(new SimpleProfiler()));
+                            context.getSource().sendSystemMessage(Component.translatable("neb.profiler.server.start"));
+                            return Command.SINGLE_SUCCESS;
+                        }))
+                        .then(Commands.literal("stop").executes(context -> {
+                            sendResult(context, ProfilerChannel.SERVER.take(SimpleProfiler.class));
+                            return Command.SINGLE_SUCCESS;
+                        }))
+                )
         ));
     }
 
-    private static int onReloadPresharedChunks(CommandContext<CommandSourceStack> context, boolean load) {
+    private static void createPresharedChunkBundle(CommandContext<CommandSourceStack> context, @Nullable Path path) {
+        MinecraftServer server = context.getSource().getServer();
+        if (path == null) {
+            path = PresharedChunkServer.locatePresharedChunkBundle(server);
+        }
+
+        PresharedChunkServer.create(server, path)
+                .whenCompleteAsync((_, exception) -> {
+                    if (exception == null) {
+                        context.getSource().sendSystemMessage(Component.translatable("neb.preshared.create.success"));
+                    } else {
+                        context.getSource().sendSystemMessage(Component.translatable("neb.preshared.create.failed"));
+                    }
+                }, server);
+    }
+
+    private static int reloadPresharedChunks(CommandContext<CommandSourceStack> context, boolean load) {
         MinecraftServer server = context.getSource().getServer();
 
         List<ServerPlayer> players = server.getPlayerList().getPlayers();

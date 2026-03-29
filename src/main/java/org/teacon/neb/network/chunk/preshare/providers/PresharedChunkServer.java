@@ -19,6 +19,7 @@ import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.network.event.RegisterConfigurationTasksEvent;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.teacon.neb.NEBConfigs;
 import org.teacon.neb.NotEnoughBandwidth;
@@ -41,6 +42,11 @@ public class PresharedChunkServer {
 
     public static volatile PresharedChunkBundle lookup = PresharedChunkBundle.EMPTY;
 
+    @NonNull
+    public static Path locatePresharedChunkBundle(MinecraftServer server) {
+        return server.getWorldPath(new LevelResource("preshared-chunks.neb"));
+    }
+
     @SubscribeEvent
     private static void on(ServerStartedEvent event) throws IOException {
         MinecraftServer server = event.getServer();
@@ -48,35 +54,12 @@ public class PresharedChunkServer {
     }
 
     public static void load(MinecraftServer server) throws IOException {
-        lookup = PresharedChunkBundle.load(server.getWorldPath(new LevelResource("preshared-chunks.neb")), server.registryAccess());
+        lookup = PresharedChunkBundle.load(locatePresharedChunkBundle(server), server.registryAccess());
     }
 
     @SubscribeEvent
     private static void on(ServerStoppingEvent event) {
         unload();
-    }
-
-    @SubscribeEvent
-    private static void on(RegisterConfigurationTasksEvent event) {
-        event.register(new ConfigurationTask() {
-            private static final Type TYPE = new Type(NotEnoughBandwidth.id("preshare_version_guard"));
-
-            @Override
-            public void start(@NotNull Consumer<Packet<?>> connection) {
-                connection.accept(new PresharedChunkGuardPacket(PresharedChunkServer.lookup.getVersion()).toVanillaClientbound());
-            }
-
-            @Override
-            public boolean tick() {
-                return true;
-            }
-
-            @Override
-            @NotNull
-            public Type type() {
-                return TYPE;
-            }
-        });
     }
 
     public static CompletableFuture<Void> create(MinecraftServer server, Path path) {
@@ -115,6 +98,29 @@ public class PresharedChunkServer {
             LOGGER.warn("Cannot create Preshared Chunk Bundle.", t);
             return CompletableFuture.<Void>failedStage(t).toCompletableFuture();
         }
+    }
+
+    @SubscribeEvent
+    private static void on(RegisterConfigurationTasksEvent event) {
+        event.register(new ConfigurationTask() {
+            private static final Type TYPE = new Type(NotEnoughBandwidth.id("preshare_version_guard"));
+
+            @Override
+            public void start(@NotNull Consumer<Packet<?>> connection) {
+                connection.accept(new PresharedChunkGuardPacket(PresharedChunkServer.lookup.getVersion()).toVanillaClientbound());
+            }
+
+            @Override
+            public boolean tick() {
+                return true;
+            }
+
+            @Override
+            @NotNull
+            public Type type() {
+                return TYPE;
+            }
+        });
     }
 
     public static void unload() {

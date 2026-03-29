@@ -1,7 +1,11 @@
 package org.teacon.neb.mixin;
 
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientCommonPacketListenerImpl;
 import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.client.multiplayer.CommonListenerCookie;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.network.protocol.game.ClientboundLoginPacket;
 import net.minecraft.world.level.ChunkPos;
@@ -18,7 +22,11 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 
 @Mixin(ClientPacketListener.class)
-public class ClientPacketListenerMixin {
+public abstract class ClientPacketListenerMixin extends ClientCommonPacketListenerImpl {
+    protected ClientPacketListenerMixin(Minecraft minecraft, Connection connection, CommonListenerCookie cookie) {
+        super(minecraft, connection, cookie);
+    }
+
     @Shadow
     @Final
     private RegistryAccess.Frozen registryAccess;
@@ -34,7 +42,7 @@ public class ClientPacketListenerMixin {
     @Inject(method = "handleLogin", at = @At("HEAD"))
     private void beforeLogin(ClientboundLoginPacket packet, CallbackInfo ci) {
         try {
-            PresharedChunkClient.load(registryAccess);
+            PresharedChunkClient.load(this.connection, registryAccess);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

@@ -4,7 +4,6 @@ import com.google.common.collect.ImmutableMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkPacketData;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.network.protocol.game.ClientboundLightUpdatePacketData;
@@ -21,7 +20,6 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.HandlerThread;
 import org.teacon.neb.network.chunk.cache.CachedChunkDebugOverlay;
 import org.teacon.neb.network.chunk.preshare.PresharedChunk;
-import org.teacon.neb.network.chunk.preshare.PresharedChunkBundle;
 import org.teacon.neb.network.chunk.preshare.PresharedChunkGuardPacket;
 import org.teacon.neb.network.chunk.preshare.PresharedChunkPacket;
 import org.teacon.neb.network.chunk.preshare.data.BlockEntityInfo;
@@ -39,7 +37,6 @@ import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 
 @EventBusSubscriber(Dist.CLIENT)
 public class PresharedChunkPacketClientImpl {
@@ -107,17 +104,7 @@ public class PresharedChunkPacketClientImpl {
             }
         });
 
-        event.register(PresharedChunkGuardPacket.TYPE, (packet, listener) -> {
-            UUID remoteVersion = packet.version(), localVersion = PresharedChunkClient.readVersion();
-            if (!remoteVersion.equals(localVersion)) {
-                UUID emptyVersion = PresharedChunkBundle.EMPTY.getVersion();
-                listener.disconnect(Component.translatable(
-                        "neb.preshared.version_mismatch",
-                        remoteVersion.equals(emptyVersion) ? "<empty>" : remoteVersion.toString(),
-                        localVersion.equals(emptyVersion) ? "<empty>" : localVersion.toString()
-                ));
-            }
-        });
+        event.register(PresharedChunkGuardPacket.TYPE, (packet, _) -> PresharedChunkClient.requestedVersion = packet.version());
     }
 
     private static void handle(PresharedChunkPacket packet, IPayloadContext listener, LocalPlayer player) {
