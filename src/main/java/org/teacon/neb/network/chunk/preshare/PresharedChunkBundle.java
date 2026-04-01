@@ -7,7 +7,6 @@ import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.level.ChunkPos;
@@ -70,7 +69,7 @@ public final class PresharedChunkBundle {
             }
 
             UUID version = FriendlyByteBuf.readUUID(input);
-            Long2ObjectMap<PresharedChunk> chunks = readCompressedBody(new ContextByteBuf(input, registryAccess, ConnectionType.NEOFORGE));
+            Long2ObjectMap<PresharedChunk> chunks = read0(new ContextByteBuf(input, registryAccess, ConnectionType.NEOFORGE));
             return new PresharedChunkBundle(version, chunks);
         } finally {
             input.release();
@@ -81,7 +80,7 @@ public final class PresharedChunkBundle {
         ContextByteBuf body = new ContextByteBuf(Unpooled.directBuffer(), registryAccess, ConnectionType.NEOFORGE);
         try {
             FriendlyByteBuf.writeUUID(body, version);
-            writeCompressedBody(body, chunks);
+            write0(body, chunks);
 
             try (InputStream is = new ByteBufInputStream(body); OutputStream os = Files.newOutputStream(path)) {
                 is.transferTo(os);
@@ -91,39 +90,26 @@ public final class PresharedChunkBundle {
         }
     }
 
-    private static Long2ObjectMap<PresharedChunk> readCompressedBody(ContextByteBuf compressed) {
-        ByteBuf input;
+    private static Long2ObjectMap<PresharedChunk> read0(ContextByteBuf compressed) {
+        ContextByteBuf input;
         CompressContext context = CompressContext.ofPresharedChunk();
         try {
-            input = context.decompress(compressed);
+            input = compressed.recreate(context.decompress(compressed));
         } finally {
             context.release();
         }
 
         try {
-            Long2ObjectMap<PresharedChunk> value = new Long2ObjectOpenHashMap<>();
-
-            int count = input.readInt();
-            for (int i = 0; i < count; i++) {
-                PresharedChunk chunk = PresharedChunk.STREAM_CODEC.decode(compressed.transform(input));
-                if (value.put(chunk.pos().pack(), chunk) != null) {
-                    throw new IllegalArgumentException("Duplicate preshared chunk: " + chunk.pos());
-                }
-            }
-
-            return value;
+            return PresharedChunksIO.read(input);
         } finally {
             input.release();
         }
     }
 
-    private static void writeCompressedBody(ContextByteBuf buffer, Long2ObjectMap<PresharedChunk> value) {
-        ByteBuf output = buffer.alloc().directBuffer();
+    private static void write0(ContextByteBuf buffer, Long2ObjectMap<PresharedChunk> value) {
+        ContextByteBuf output = buffer.recreate(buffer.alloc().directBuffer());
         try {
-            output.writeInt(value.size());
-            for (PresharedChunk chunk : value.values()) {
-                PresharedChunk.STREAM_CODEC.encode(buffer.transform(output), chunk);
-            }
+            PresharedChunksIO.write(value, output);
 
             CompressContext context = CompressContext.ofPresharedChunk();
             try {

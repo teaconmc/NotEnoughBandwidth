@@ -22,16 +22,6 @@ public record PresharedChunk(
         List<LevelLightSection> lights,
         Int2ObjectMap<BlockEntityInfo> blockEntities
 ) {
-    public static final StreamCodec<ContextByteBuf, PresharedChunk> STREAM_CODEC = StreamCodec.composite(
-            Identifier.STREAM_CODEC, PresharedChunk::level,
-            ChunkPos.STREAM_CODEC, PresharedChunk::pos,
-            HeightMap.STREAM_CODEC, PresharedChunk::heightmaps,
-            SectionInstance.STREAM_CODEC.apply(ByteBufCodecs.list()), PresharedChunk::sections,
-            LevelLightSection.STREAM_CODEC.apply(ByteBufCodecs.list()), PresharedChunk::lights,
-            BlockEntityInfo.BLOCK_CODEC, PresharedChunk::blockEntities,
-            PresharedChunk::new
-    );
-
     public static PresharedChunk createCache(LevelChunk chunk) {
         Identifier level = chunk.getLevel().dimension().identifier();
         ChunkPos pos = chunk.getPos();

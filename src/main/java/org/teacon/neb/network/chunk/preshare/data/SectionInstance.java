@@ -3,6 +3,7 @@ package org.teacon.neb.network.chunk.preshare.data;
 import io.netty.buffer.Unpooled;
 import net.minecraft.core.Holder;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.state.BlockState;
@@ -20,8 +21,8 @@ public record SectionInstance(
         LevelChunkSection chunk,
         Lock lock
 ) {
-    public static final StreamCodec<ContextByteBuf, SectionInstance> STREAM_CODEC = StreamCodec.composite(
-            new StreamCodec<>() {
+    public static final StreamCodec<ContextByteBuf, List<SectionInstance>> STREAM_CODEC = StreamCodec.composite(
+            new StreamCodec<ContextByteBuf, LevelChunkSection>() {
                 @Override
                 public LevelChunkSection decode(ContextByteBuf buffer) {
                     LevelChunkSection section = new LevelChunkSection(buffer.getPalettedContainerFactory());
@@ -35,7 +36,7 @@ public record SectionInstance(
                 }
             }, SectionInstance::chunk,
             chunk -> new SectionInstance(chunk, new ReentrantLock())
-    );
+    ).apply(ByteBufCodecs.list());
 
     public static List<SectionInstance> createSectionsCache(LevelChunk chunk) {
         List<SectionInstance> sections = new ArrayList<>();

@@ -75,7 +75,7 @@ public class PresharedChunkServer {
             }
 
             List<PresharedChunk> chunks = new ArrayList<>();
-            ServerLevel level = Objects.requireNonNull(server.getLevel(Level.OVERWORLD));
+            ServerLevel level = server.overworld();
 
             new ChunkTrackingView.Positioned(
                     ChunkPos.containing(level.getRespawnData().pos()),

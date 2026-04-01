@@ -174,6 +174,9 @@ public class NEBCommands {
         MinecraftServer server = context.getSource().getServer();
         if (path == null) {
             path = PresharedChunkServer.locatePresharedChunkBundle(server);
+        } else if (Files.exists(path)) {
+            context.getSource().sendSystemMessage(Component.translatable("neb.preshared.create.failed"));
+            throw new RuntimeException("Bundle already existed: " + path);
         }
 
         PresharedChunkServer.create(server, path)
