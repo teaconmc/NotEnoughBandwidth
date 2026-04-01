@@ -26,7 +26,7 @@ public record PresharedChunk(
             Identifier.STREAM_CODEC, PresharedChunk::level,
             ChunkPos.STREAM_CODEC, PresharedChunk::pos,
             HeightMap.STREAM_CODEC, PresharedChunk::heightmaps,
-            SectionInstance.STREAM_CODEC, PresharedChunk::sections,
+            SectionInstance.STREAM_CODEC.apply(ByteBufCodecs.list()), PresharedChunk::sections,
             LevelLightSection.STREAM_CODEC.apply(ByteBufCodecs.list()), PresharedChunk::lights,
             BlockEntityInfo.BLOCK_CODEC, PresharedChunk::blockEntities,
             PresharedChunk::new

@@ -20,28 +20,22 @@ public record SectionInstance(
         LevelChunkSection chunk,
         Lock lock
 ) {
-    public static final StreamCodec<ContextByteBuf, List<SectionInstance>> STREAM_CODEC = new StreamCodec<>() {
-        @Override
-        public List<SectionInstance> decode(ContextByteBuf buffer) {
-            List<LevelChunkSection> sections = LevelChunkIO.read(buffer);
+    public static final StreamCodec<ContextByteBuf, SectionInstance> STREAM_CODEC = StreamCodec.composite(
+            new StreamCodec<>() {
+                @Override
+                public LevelChunkSection decode(ContextByteBuf buffer) {
+                    LevelChunkSection section = new LevelChunkSection(buffer.getPalettedContainerFactory());
+                    section.read(buffer);
+                    return section;
+                }
 
-            List<SectionInstance> value = new ArrayList<>(sections.size());
-            for (LevelChunkSection section : sections) {
-                value.add(new SectionInstance(section, new ReentrantLock()));
-            }
-            return value;
-        }
-
-        @Override
-        public void encode(ContextByteBuf buffer, List<SectionInstance> value) {
-            List<LevelChunkSection> sections = new ArrayList<>(value.size());
-            for (SectionInstance instance : value) {
-                sections.add(instance.chunk);
-            }
-
-            LevelChunkIO.write(buffer, sections);
-        }
-    };
+                @Override
+                public void encode(ContextByteBuf buffer, LevelChunkSection value) {
+                    value.write(buffer);
+                }
+            }, SectionInstance::chunk,
+            chunk -> new SectionInstance(chunk, new ReentrantLock())
+    );
 
     public static List<SectionInstance> createSectionsCache(LevelChunk chunk) {
         List<SectionInstance> sections = new ArrayList<>();

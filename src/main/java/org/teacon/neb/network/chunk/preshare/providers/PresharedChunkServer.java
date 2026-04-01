@@ -33,6 +33,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
@@ -62,7 +63,7 @@ public class PresharedChunkServer {
         unload();
     }
 
-    public static CompletableFuture<Void> create(MinecraftServer server, Path path) {
+    public static CompletableFuture<UUID> create(MinecraftServer server, Path path) {
         try {
             Component message = Component.translatable("neb.preshared.create.working");
             server.sendSystemMessage(message);
@@ -86,9 +87,10 @@ public class PresharedChunkServer {
             });
 
             PresharedChunkBundle bundle = new PresharedChunkBundle(chunks);
-            return CompletableFuture.runAsync(() -> {
+            return CompletableFuture.supplyAsync(() -> {
                 try {
                     bundle.write(path, server.registryAccess());
+                    return bundle.getVersion();
                 } catch (IOException e) {
                     LOGGER.warn("Cannot write Preshared Chunk Bundle to {}", path, e);
                     throw new UncheckedIOException(e);
@@ -96,7 +98,7 @@ public class PresharedChunkServer {
             });
         } catch (Throwable t) {
             LOGGER.warn("Cannot create Preshared Chunk Bundle.", t);
-            return CompletableFuture.<Void>failedStage(t).toCompletableFuture();
+            return CompletableFuture.<UUID>failedStage(t).toCompletableFuture();
         }
     }
 
