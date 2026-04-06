@@ -4,7 +4,6 @@ import com.mojang.logging.LogUtils;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.exporter.HTTPServer;
-import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import org.slf4j.Logger;
 import org.teacon.neb.profiler.ProfilerChannel;
 import org.teacon.neb.profiler.Snapshot;
@@ -36,20 +35,18 @@ public final class PrometheusProfiler implements ProfilerChannel.IProfiler {
     @Override
     public void onTransmitPacket(Snapshot snapshot) {
         TRANSMIT_COMPRESSED.inc(snapshot.getCompressedSize());
-        for (Object2LongMap.Entry<String> entry : snapshot) {
-            String packetType = Snapshot.getType(entry);
-            COMPRESSIBILITY.labels(packetType).set(Snapshot.getCompressibility(entry));
-            TRANSMIT.labels(packetType).inc(Snapshot.getSize(entry));
+        for (Snapshot.Entry entry : snapshot) {
+            COMPRESSIBILITY.labels(entry.getType()).set(entry.getRatio());
+            TRANSMIT.labels(entry.getType()).inc(entry.getSize());
         }
     }
 
     @Override
     public void onReceivePacket(Snapshot snapshot) {
         RECEIVE_COMPRESSED.inc(snapshot.getCompressedSize());
-        for (Object2LongMap.Entry<String> entry : snapshot) {
-            String packetType = Snapshot.getType(entry);
-            COMPRESSIBILITY.labels(packetType).set(Snapshot.getCompressibility(entry));
-            RECEIVE.labels(packetType).inc(Snapshot.getSize(entry));
+        for (Snapshot.Entry entry : snapshot) {
+            COMPRESSIBILITY.labels(entry.getType()).set(entry.getRatio());
+            RECEIVE.labels(entry.getType()).inc(entry.getSize());
         }
     }
 }

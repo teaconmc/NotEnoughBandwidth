@@ -51,7 +51,7 @@ public final class CompressDecoder extends MessageToMessageDecoder<CompressedPac
             throw new AssertionError("CompressDecoder should only be enabled in PLAY connection state.");
         }
 
-        Snapshot snapshot = Snapshot.prepare();
+        Snapshot snapshot = ProfilerChannel.prepareSnapshot(false, protocolInfo.flow());
         ByteBuf buf = CompressContext.get(context).decompress(msg.buf());
         while (buf.readableBytes() != 0) {
             int length = VarInt.read(buf);
@@ -72,16 +72,18 @@ public final class CompressDecoder extends MessageToMessageDecoder<CompressedPac
             switch (out.size() - size) {
                 case 0 -> {
                 }
-                case 1 -> snapshot.put((Packet<?>) out.getLast(), packet.writerIndex());
+                case 1 -> {
+                    if (snapshot != null) {
+                        snapshot.put((Packet<?>) out.getLast(), packet.writerIndex());
+                    }
+                }
                 default -> throw new AssertionError("PacketDecoder should only push one packet.");
             }
         }
 
-        ProfilerChannel channel = switch (protocolInfo.flow()) {
-            case CLIENTBOUND -> ProfilerChannel.CLIENT;
-            case SERVERBOUND -> ProfilerChannel.SERVER;
-        };
-        channel.onReceivePacket(snapshot.build(buf.writerIndex(), msg.buf().writerIndex()));
+        if (snapshot != null) {
+            snapshot.publish(buf.writerIndex(), msg.buf().writerIndex());
+        }
 
         buf.release();
         msg.buf().release();

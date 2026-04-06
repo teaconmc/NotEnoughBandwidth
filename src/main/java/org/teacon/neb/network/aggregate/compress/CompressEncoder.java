@@ -18,7 +18,6 @@ import org.teacon.neb.utils.vm.LookupAccess;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
-import java.util.Collection;
 import java.util.List;
 
 @ChannelHandler.Sharable
@@ -42,7 +41,7 @@ public final class CompressEncoder extends MessageToMessageEncoder<CompressEncod
     private CompressEncoder() {
     }
 
-    public record CompressedTransfer(PacketType<CompressedPacket> type, Collection<Packet<?>> packets) {
+    public record CompressedTransfer(PacketType<CompressedPacket> type, List<Packet<?>> packets) {
     }
 
     @Override
@@ -52,7 +51,7 @@ public final class CompressEncoder extends MessageToMessageEncoder<CompressEncod
             throw new AssertionError("CompressEncoder should only be enabled in PLAY connection state.");
         }
 
-        Snapshot snapshot = Snapshot.prepare();
+        Snapshot snapshot = ProfilerChannel.prepareSnapshot(true, encoder.getProtocolInfo().flow());
         ByteBuf buf = context.alloc().directBuffer(), temp = context.alloc().directBuffer();
 
         for (Packet<?> packet : transfer.packets()) {
@@ -65,20 +64,17 @@ public final class CompressEncoder extends MessageToMessageEncoder<CompressEncod
             }
 
             int size = t.writerIndex();
-            snapshot.put(packet, size);
+            if (snapshot != null) {
+                snapshot.put(packet, size);
+            }
             VarInt.write(buf, size);
             buf.writeBytes(t);
         }
 
         CompressContext.get(context).compress(buf, temp);
-        if (buf.writerIndex() != 0) {
-            ProfilerChannel channel = switch (encoder.getProtocolInfo().flow()) {
-                case CLIENTBOUND -> ProfilerChannel.SERVER;
-                case SERVERBOUND -> ProfilerChannel.CLIENT;
-            };
-            channel.onTransmitPacket(snapshot.build(buf.writerIndex(), temp.writerIndex()));
+        if (snapshot != null) {
+            snapshot.publish(buf.writerIndex(), temp.writerIndex());
         }
-
         try {
             ENCODE.invokeExact(encoder, context, (Packet<?>) new CompressedPacket(transfer.type(), temp), buf);
         } catch (Throwable t2) {

@@ -1,8 +1,6 @@
 package org.teacon.neb.profiler;
 
-import it.unimi.dsi.fastutil.objects.Object2LongMap;
-import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import net.minecraft.network.protocol.PacketFlow;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -34,7 +32,8 @@ public final class ProfilerChannel {
         }
     }
 
-    private final Object2ObjectMap<String, PacketCompressibility> compressibility = new Object2ObjectOpenHashMap<>();
+    private final SnapshotContext transmitContext = new SnapshotContext(this::onTransmitPacket);
+    private final SnapshotContext receiveContext = new SnapshotContext(this::onReceivePacket);
 
     private volatile IProfiler[] profilers = new IProfiler[0];
     private final Lock READ, WRITE;
@@ -43,6 +42,15 @@ public final class ProfilerChannel {
         ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
         READ = rwLock.readLock();
         WRITE = rwLock.writeLock();
+    }
+
+    @Nullable
+    public static Snapshot prepareSnapshot(boolean encoder, PacketFlow flow) {
+        ProfilerChannel channel = encoder == (flow == PacketFlow.CLIENTBOUND) ? SERVER : CLIENT;
+        if (channel.profilers.length == 0) {
+            return null;
+        }
+        return Snapshot.prepare(encoder ? channel.transmitContext : channel.receiveContext);
     }
 
     @SuppressWarnings("unchecked")
@@ -104,8 +112,6 @@ public final class ProfilerChannel {
     }
 
     public void onTransmitPacket(Snapshot snapshot) {
-        injectCompressibility(snapshot);
-
         READ.lock();
         try {
             IProfiler[] profilers = this.profilers;
@@ -118,8 +124,6 @@ public final class ProfilerChannel {
     }
 
     public void onReceivePacket(Snapshot snapshot) {
-        injectCompressibility(snapshot);
-
         READ.lock();
         try {
             IProfiler[] profilers = this.profilers;
@@ -128,42 +132,6 @@ public final class ProfilerChannel {
             }
         } finally {
             READ.unlock();
-        }
-    }
-
-    private synchronized void injectCompressibility(Snapshot snapshot) {
-        float compressibility = Math.clamp(snapshot.getCompressedSize() / (float) snapshot.getTotalSize(), 0, 1);
-        for (Object2LongMap.Entry<String> entry : snapshot) {
-            float v = this.compressibility.computeIfAbsent(Snapshot.getType(entry), rl -> new PacketCompressibility())
-                    .putSample(compressibility, Snapshot.getSize(entry) / (float) snapshot.getTotalSize());
-
-            entry.setValue(Snapshot.withCompressibility(entry, v));
-        }
-    }
-
-    private static final class PacketCompressibility {
-        private static final int SAMPLE = Integer.parseInt(Objects.requireNonNullElse(System.getenv("NEB_PROFILER_COMPRESSIBILITY_SAMPLE"), "50"));
-
-        private final float[] samples = new float[SAMPLE * 2]; // value1, weight1, value2, weight2, ...
-        private int index = 0;
-        private float totalValue = 0, totalWeight = 0;
-
-        // must be synchronized by external locks.
-        public float putSample(float value, float weight) {
-            int valueI = index << 1, weightI = valueI | 1;
-
-            float replacedSampleValue = samples[valueI];
-            float replacedSampleWeight = samples[weightI];
-            totalValue -= replacedSampleValue * replacedSampleWeight;
-            totalWeight -= replacedSampleWeight;
-
-            index = (index + 1) % SAMPLE;
-            samples[valueI] = value;
-            samples[weightI] = weight;
-            totalValue += value * weight;
-            totalWeight += weight;
-
-            return totalValue / totalWeight;
         }
     }
 

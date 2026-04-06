@@ -13,28 +13,16 @@ public class SimpleProfiler implements ProfilerChannel.IProfiler {
 
         private static final int VALUE_MAX = (1 << 28) - 1;
 
-        public static int getTransmit(long value) {
+        public static int unpackTransmit(long value) {
             return (int) ((value >>> 36) & VALUE_MAX);
         }
 
-        public static int getReceive(long value) {
+        public static int unpackReceive(long value) {
             return (int) ((value >>> 8) & VALUE_MAX);
         }
 
-        public static float getCompressibility(long value) {
+        public static float unpackRatio(long value) {
             return (value & 0xFF) / 128f;
-        }
-
-        public static long withTransmit(long value, int transmit) {
-            return pack(transmit, getReceive(value), getCompressibility(value));
-        }
-
-        public static long withReceive(long value, int receive) {
-            return pack(getTransmit(value), receive, getCompressibility(value));
-        }
-
-        public static long withCompressibility(long value, float compressibility) {
-            return pack(getTransmit(value), getReceive(value), compressibility);
         }
 
         public static long pack(int transmit, int receive, float compressibility) {
@@ -53,14 +41,15 @@ public class SimpleProfiler implements ProfilerChannel.IProfiler {
     public synchronized void onTransmitPacket(Snapshot snapshot) {
         transmit += snapshot.getTotalSize();
         transmitCompressed += snapshot.getCompressedSize();
-        for (Object2LongMap.Entry<String> entry : snapshot) {
-            long summary = this.summary.getOrDefault(Snapshot.getType(entry), Summary.EMPTY);
+
+        for (Snapshot.Entry entry : snapshot) {
+            long summary = this.summary.getOrDefault(entry.getType(), Summary.EMPTY);
             summary = Summary.pack(
-                    Summary.getTransmit(summary) + Snapshot.getSize(entry),
-                    Summary.getReceive(summary),
-                    Snapshot.getCompressibility(entry)
+                    Summary.unpackTransmit(summary) + entry.getSize(),
+                    Summary.unpackReceive(summary),
+                    entry.getRatio()
             );
-            this.summary.put(Snapshot.getType(entry), summary);
+            this.summary.put(entry.getType(), summary);
         }
     }
 
@@ -68,14 +57,14 @@ public class SimpleProfiler implements ProfilerChannel.IProfiler {
     public synchronized void onReceivePacket(Snapshot snapshot) {
         receive += snapshot.getTotalSize();
         receiveCompressed += snapshot.getCompressedSize();
-        for (Object2LongMap.Entry<String> entry : snapshot) {
-            long summary = this.summary.getOrDefault(Snapshot.getType(entry), Summary.EMPTY);
+        for (Snapshot.Entry entry : snapshot) {
+            long summary = this.summary.getOrDefault(entry.getType(), Summary.EMPTY);
             summary = Summary.pack(
-                    Summary.getTransmit(summary),
-                    Summary.getReceive(summary) + Snapshot.getSize(entry),
-                    Snapshot.getCompressibility(entry)
+                    Summary.unpackTransmit(summary),
+                    Summary.unpackReceive(summary) + entry.getSize(),
+                    entry.getRatio()
             );
-            this.summary.put(Snapshot.getType(entry), summary);
+            this.summary.put(entry.getType(), summary);
         }
     }
 
@@ -94,7 +83,7 @@ public class SimpleProfiler implements ProfilerChannel.IProfiler {
 
         summary.object2LongEntrySet().stream().sorted(Comparator.comparing(Object2LongMap.Entry::getKey)).forEach(entry -> {
             long summary = entry.getLongValue();
-            writer.line(entry.getKey(), Summary.getTransmit(summary), Summary.getReceive(summary), Summary.getCompressibility(summary));
+            writer.line(entry.getKey(), Summary.unpackTransmit(summary), Summary.unpackReceive(summary), Summary.unpackRatio(summary));
         });
 
         return writer.builder.toString();
