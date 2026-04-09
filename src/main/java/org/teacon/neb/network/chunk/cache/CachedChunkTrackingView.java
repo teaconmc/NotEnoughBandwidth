@@ -63,7 +63,7 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
      * existence checks without boxing.</p>
      *
      * <p><b>Note:</b> This could potentially be replaced by a value-record
-     * representation once Project Valhalla becomes available.</p>
+     * representation once Project Valhalla is available.</p>
      */
     private final Long2LongLinkedOpenHashMap cache = new Long2LongLinkedOpenHashMap();
 
@@ -74,8 +74,21 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
 
     @Override
     public boolean contains(int x, int z, boolean includeNeighbors) {
-        // FIXME: Investigate how 'includeNeighbors' will affect the check.
-        return major.contains(x, z, includeNeighbors) || cache.containsKey(ChunkPos.pack(x, z));
+        if (major.contains(x, z, includeNeighbors) || cache.containsKey(ChunkPos.pack(x, z))) {
+            return true;
+        }
+
+        if (includeNeighbors) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if ((dx != 0 || dz != 0) && cache.containsKey(ChunkPos.pack(x + dx, z + dz))) {
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        return false;
     }
 
     @Override
@@ -92,8 +105,6 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
         void startChunkTracking(ChunkPos pos);
 
         void stopChunkTracking(ChunkPos pos);
-
-        void putTicket(ChunkPos pos, int ticks);
     }
 
     /**
@@ -160,7 +171,6 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
                 }
             }, chunkPos -> {
                 if (next.center().getChessboardDistance(chunkPos) <= chunkCacheDistance) {
-                    context.putTicket(player.chunkPosition(), chunkCacheTimeout * 20 /* FIXME: /tick wrap will break this! */);
                     cache.put(chunkPos.pack(), now);
                 }
             });
