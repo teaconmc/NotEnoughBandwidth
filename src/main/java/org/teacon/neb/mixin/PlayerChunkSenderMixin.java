@@ -15,6 +15,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Unique;
 import org.teacon.neb.network.chunk.preshare.PresharedChunk;
+import org.teacon.neb.network.chunk.preshare.PresharedChunkBundle;
 import org.teacon.neb.network.chunk.preshare.providers.PresharedChunkServer;
 import org.teacon.neb.utils.vm.LookupAccess;
 
@@ -42,7 +43,7 @@ public class PlayerChunkSenderMixin {
      */
     @Overwrite
     private static void sendChunk(ServerGamePacketListenerImpl connection, ServerLevel level, LevelChunk chunk) {
-        PresharedChunk preshared = PresharedChunkServer.lookup.getChunk(chunk.getLevel(), chunk.getPos());
+        PresharedChunk preshared = PresharedChunkBundle.getChunk(PresharedChunkServer.lookup, level, chunk.getPos());
         if (preshared == null) {
             // Vanilla implementation
             connection.send(chunk.getAuxLightManager(chunk.getPos()).sendLightDataTo(

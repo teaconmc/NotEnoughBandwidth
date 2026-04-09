@@ -42,7 +42,7 @@ public abstract class ClientPacketListenerMixin extends ClientCommonPacketListen
     @Inject(method = "handleLogin", at = @At("HEAD"))
     private void beforeLogin(ClientboundLoginPacket packet, CallbackInfo ci) {
         try {
-            PresharedChunkClient.load(this.connection, registryAccess);
+            PresharedChunkClient.handleLogin(this.connection, registryAccess);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

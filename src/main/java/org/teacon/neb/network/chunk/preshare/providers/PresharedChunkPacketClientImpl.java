@@ -7,20 +7,14 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkPacketData;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.network.protocol.game.ClientboundLightUpdatePacketData;
-import net.minecraft.util.profiling.Profiler;
-import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
-import net.neoforged.neoforge.network.registration.HandlerThread;
+import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NullMarked;
 import org.teacon.neb.network.chunk.cache.CachedChunkDebugOverlay;
 import org.teacon.neb.network.chunk.preshare.PresharedChunk;
-import org.teacon.neb.network.chunk.preshare.PresharedChunkGuardPacket;
 import org.teacon.neb.network.chunk.preshare.PresharedChunkPacket;
 import org.teacon.neb.network.chunk.preshare.data.BlockEntityInfo;
 import org.teacon.neb.network.chunk.preshare.data.LevelLightSection;
@@ -36,9 +30,8 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
-@EventBusSubscriber(Dist.CLIENT)
+@NullMarked
 public class PresharedChunkPacketClientImpl {
     private static final MethodHandle CLCPD_NEW, CLCPD_BEI_NEW, CLUPD_NEW, CLCWLP_NEW;
 
@@ -84,40 +77,16 @@ public class PresharedChunkPacketClientImpl {
         }
     }
 
-    @SubscribeEvent
-    private static void on(RegisterClientPayloadHandlersEvent event) {
-        event.register(PresharedChunkPacket.TYPE, HandlerThread.NETWORK, (packet, listener) -> {
-            LocalPlayer player = (LocalPlayer) PLAYER.get(Minecraft.getInstance());
-            if (player == null) {
-                player = (LocalPlayer) PLAYER.getAcquire(Minecraft.getInstance());
-            }
+    public static ClientboundLevelChunkWithLightPacket buildVanillaChunkPacket(PresharedChunkPacket packet, PresharedChunk base) {
+        ChunkPos pos = base.pos();
+        ClientboundLevelChunkPacketData chunk = applyChunk(packet, base);
+        ClientboundLightUpdatePacketData light = applyLight(packet, base);
 
-            if (player != null) {
-                handle(packet, listener, player);
-            } else {
-                listener.enqueueWork(() -> {
-                    ProfilerFiller profiler = Profiler.get();
-                    profiler.push("decodePresharedChunk");
-                    handle(packet, listener, Objects.requireNonNull(Minecraft.getInstance().player));
-                    profiler.pop();
-                });
-            }
-        });
-
-        event.register(PresharedChunkGuardPacket.TYPE, (packet, _) -> PresharedChunkClient.requestedVersion = packet.version());
-    }
-
-    private static void handle(PresharedChunkPacket packet, IPayloadContext listener, LocalPlayer player) {
-        PresharedChunk preshared = PresharedChunkClient.lookup.getChunk(player.level(), packet.pos());
-        if (preshared == null) {
-            throw new IllegalStateException("Receiving unknown preshared-chunks.");
+        try {
+            return (ClientboundLevelChunkWithLightPacket) CLCWLP_NEW.invokeExact(pos.x(), pos.z(), chunk, light);
+        } catch (Throwable e) {
+            throw LookupAccess.raise(e);
         }
-
-        ClientboundLevelChunkWithLightPacket pkt = apply(packet, preshared);
-        listener.enqueueWork(() -> {
-            listener.handle(pkt);
-            CachedChunkDebugOverlay.mark(ChunkPos.pack(pkt.getX(), pkt.getZ()), CachedChunkDebugOverlay.STATE_RECEIVE_PRESHARED_CHUNK);
-        });
     }
 
     private static ClientboundLevelChunkPacketData applyChunk(PresharedChunkPacket packet, PresharedChunk base) {
@@ -175,15 +144,12 @@ public class PresharedChunkPacketClientImpl {
         }
     }
 
-    private static ClientboundLevelChunkWithLightPacket apply(PresharedChunkPacket packet, PresharedChunk base) {
-        ChunkPos pos = base.pos();
-        ClientboundLevelChunkPacketData chunk = applyChunk(packet, base);
-        ClientboundLightUpdatePacketData light = applyLight(packet, base);
-
-        try {
-            return (ClientboundLevelChunkWithLightPacket) CLCWLP_NEW.invokeExact(pos.x(), pos.z(), chunk, light);
-        } catch (Throwable e) {
-            throw LookupAccess.raise(e);
+    @Nullable
+    static LocalPlayer getLocalPlayer() {
+        LocalPlayer player = (LocalPlayer) PLAYER.get(Minecraft.getInstance());
+        if (player == null) {
+            player = (LocalPlayer) PLAYER.getAcquire(Minecraft.getInstance());
         }
+        return player;
     }
 }

@@ -2,13 +2,12 @@ package org.teacon.neb.network.chunk.preshare.providers;
 
 import com.mojang.logging.LogUtils;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ChunkTrackingView;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.network.ConfigurationTask;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -17,8 +16,10 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
+import net.neoforged.neoforge.network.configuration.ICustomConfigurationTask;
 import net.neoforged.neoforge.network.event.RegisterConfigurationTasksEvent;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.teacon.neb.NEBConfigs;
@@ -32,7 +33,6 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -41,7 +41,8 @@ import java.util.function.Consumer;
 public class PresharedChunkServer {
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    public static volatile PresharedChunkBundle lookup = PresharedChunkBundle.EMPTY;
+    @Nullable
+    public static volatile PresharedChunkBundle lookup = null;
 
     @NonNull
     public static Path locatePresharedChunkBundle(MinecraftServer server) {
@@ -102,19 +103,24 @@ public class PresharedChunkServer {
         }
     }
 
+    public static void unload() {
+        lookup = null;
+    }
+
     @SubscribeEvent
     private static void on(RegisterConfigurationTasksEvent event) {
-        event.register(new ConfigurationTask() {
+        PresharedChunkBundle lookup = PresharedChunkServer.lookup;
+        if (lookup == null || event.getListener().getConnection().isMemoryConnection()) {
+            return;
+        }
+
+        event.register(new ICustomConfigurationTask() {
             private static final Type TYPE = new Type(NotEnoughBandwidth.id("preshare_version_guard"));
 
             @Override
-            public void start(@NotNull Consumer<Packet<?>> connection) {
-                connection.accept(new PresharedChunkGuardPacket(PresharedChunkServer.lookup.getVersion()).toVanillaClientbound());
-            }
-
-            @Override
-            public boolean tick() {
-                return true;
+            public void run(@NotNull Consumer<CustomPacketPayload> connection) {
+                connection.accept(new PresharedChunkGuardPacket(lookup.getVersion()));
+                event.getListener().finishCurrentTask(TYPE);
             }
 
             @Override
@@ -123,9 +129,5 @@ public class PresharedChunkServer {
                 return TYPE;
             }
         });
-    }
-
-    public static void unload() {
-        lookup = PresharedChunkBundle.EMPTY;
     }
 }

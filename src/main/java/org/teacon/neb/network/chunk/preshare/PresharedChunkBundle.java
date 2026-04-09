@@ -6,7 +6,6 @@ import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.level.ChunkPos;
@@ -48,18 +47,18 @@ public final class PresharedChunkBundle {
         return version;
     }
 
-    public @Nullable PresharedChunk getChunk(Level level, ChunkPos pos) {
-        if (level.dimension() == Level.OVERWORLD) {
-            return chunks.get(pos.pack());
+    @Nullable
+    public static PresharedChunk getChunk(PresharedChunkBundle bundle, Level level, ChunkPos pos) {
+        if (bundle != null && level.dimension() == Level.OVERWORLD) {
+            return bundle.chunks.get(pos.pack());
         }
         return null;
     }
 
-    public static final PresharedChunkBundle EMPTY = new PresharedChunkBundle(UUID.fromString("2d924004-4f5c-43ba-835c-bff6d6831fd2"), Long2ObjectMaps.emptyMap());
-
+    @Nullable
     public static PresharedChunkBundle load(Path path, RegistryAccess registryAccess) throws IOException {
         if (!Files.exists(path)) {
-            return EMPTY;
+            return null;
         }
 
         ByteBuf input = Unpooled.directBuffer();
