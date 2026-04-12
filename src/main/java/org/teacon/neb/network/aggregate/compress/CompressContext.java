@@ -18,7 +18,7 @@ import java.lang.ref.Cleaner;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
-public final class CompressContext {
+public final class CompressContext implements AutoCloseable {
     private static final int THRESHOLD = 160;
 
     private static final Cleaner CLEANER = Cleaner.create();
@@ -65,8 +65,11 @@ public final class CompressContext {
     public static CompressContext ofPresharedChunk() {
         ZstdCompressCtx compress = new ZstdCompressCtx()
                 .setLevel(NEBConfigs.PRESHARED_CHUNK_COMPRESS_LEVEL.get())
-                .setChecksum(true);
-        ZstdDecompressCtx decompress = new ZstdDecompressCtx();
+                .setChecksum(false)
+                .setMagicless(true)
+                .setContentSize(false);
+        ZstdDecompressCtx decompress = new ZstdDecompressCtx()
+                .setMagicless(true);
 
         return new CompressContext(compress, decompress);
     }
@@ -169,7 +172,8 @@ public final class CompressContext {
         return target.position();
     }
 
-    public void release() {
+    @Override
+    public void close() {
         this.cleanable.clean();
     }
 }

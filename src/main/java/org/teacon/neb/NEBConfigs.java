@@ -34,7 +34,8 @@ public final class NEBConfigs {
     public static ModConfigSpec.ConfigValue<Integer> CHUNK_CACHE_DISTANCE;
     public static ModConfigSpec.ConfigValue<Integer> CHUNK_CACHE_TIMEOUT;
 
-    public static ModConfigSpec.ConfigValue<Integer> PRESHARED_CHUNK_DISTANCE;
+    public static ModConfigSpec.ConfigValue<String> PRESHARED_CHUNK_STATIC_DISPATCH_VERSION;
+    public static ModConfigSpec.ConfigValue<String> PRESHARED_CHUNK_DYNAMIC_DISPATCH_URL;
     public static ModConfigSpec.ConfigValue<Integer> PRESHARED_CHUNK_COMPRESS_LEVEL;
 
     private static ModConfigSpec.ConfigValue<List<? extends String>> PACKET_BLACKLIST;
@@ -76,19 +77,24 @@ public final class NEBConfigs {
         builder.pop();
 
         builder.comment(formatComments("""
-                        Preshared Chunk Bundle is an archive that contains a pre-generated, preshared set of chunks near the world spawn point.
-                        This bundle is highly compressed and should be distributed via external sources (e.g. CDN).
-                        When syncing chunks inside this bundle, the server sends a small diff instead of full data,
-                        reducing network bandwidth usage.
+                        Dispatch chunks in third-party approaches.
+                        Server loads chunks from static_dispatch, while clients loads chunks in both manner.
+                        When syncing chunks, the server sends a small diff instead of full data, reducing network bandwidth usage.
                         """))
-                .push("preshared_chunk_bundle");
-        PRESHARED_CHUNK_DISTANCE = builder
+                .push("chunk_cdn");
+        PRESHARED_CHUNK_STATIC_DISPATCH_VERSION = builder
                 .comment(formatComments("""
-                        Distance threshold in chunks.
-                        Chunks within (view distance + this value) from the player
-                        will be included in the Preshared Chunk Bundle.
+                        Loads chunks from local disk (/preshared-chunks/<version>/...).
+                        Leave it to empty to disable this feature.
                         """))
-                .defineInRange("distance", 5, 0, Integer.MAX_VALUE);
+                .define("static_dispatch_version", "");
+        PRESHARED_CHUNK_DYNAMIC_DISPATCH_URL = builder.comment(formatComments("""
+                        Loads chunks from remove server, accepting http (DONOT USE THIS IN PRODUCTION SERVER!) and https protocol,
+                        with Java String#format styled placeholders for %1$s (version), %2$d (gridX), %3$d (gridZ).
+                        Remote server must return this correct data, as there won't be much validation in client sides.
+                        Leave it to empty to disable this feature.
+                        """))
+                .define("dynamic_dispatch_url", "");
         PRESHARED_CHUNK_COMPRESS_LEVEL = builder
                 .comment(formatComments("ZSTD compression level for the Preshared Chunk Bundle."))
                 .defineInRange("compress_level", 22, 0, Integer.MAX_VALUE);

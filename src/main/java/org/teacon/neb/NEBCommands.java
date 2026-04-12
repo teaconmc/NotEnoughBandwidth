@@ -1,7 +1,6 @@
 package org.teacon.neb;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
@@ -33,13 +32,13 @@ import net.neoforged.neoforge.server.permission.nodes.PermissionNode;
 import net.neoforged.neoforge.server.permission.nodes.PermissionTypes;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
-import org.teacon.neb.network.chunk.preshare.providers.PresharedChunkServer;
 import org.teacon.neb.profiler.ProfilerChannel;
 import org.teacon.neb.profiler.impl.SimpleProfiler;
 import org.teacon.neb.utils.vm.LookupAccess;
 
 import java.io.IOException;
 import java.lang.invoke.VarHandle;
+import java.lang.ref.Reference;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -127,34 +126,6 @@ public class NEBCommands {
     @SubscribeEvent
     private static void on(RegisterCommandsEvent event) {
         event.getDispatcher().register(Commands.literal("teacon").then(Commands.literal("neb")
-                .then(Commands.literal("preshared")
-                        .requires(source -> {
-                            if (source.source instanceof MinecraftServer) {
-                                return true;
-                            }
-                            if (!FMLEnvironment.isProduction()) {
-                                ServerPlayer player = PlayerCommandSourceAccessor.from(source.source);
-                                if (player != null) {
-                                    return source.getServer().isSingleplayerOwner(player.nameAndId());
-                                }
-                            }
-                            return false;
-                        })
-                        .then(Commands.literal("create")
-                                .then(Commands.argument("path", StringArgumentType.greedyString())
-                                        .executes(context -> {
-                                            createPresharedChunkBundle(context, Path.of(context.getArgument("path", String.class)));
-                                            return Command.SINGLE_SUCCESS;
-                                        })
-                                )
-                                .executes(context -> {
-                                    createPresharedChunkBundle(context, null);
-                                    return Command.SINGLE_SUCCESS;
-                                })
-                        )
-                        .then(Commands.literal("reload").executes(context -> reloadPresharedChunks(context, true)))
-                        .then(Commands.literal("unload").executes(context -> reloadPresharedChunks(context, false)))
-                )
                 .then(Commands.literal("profiler")
                         .requires(NEBCommands::checkAdministrator)
                         .then(Commands.literal("start").executes(context -> {
@@ -168,48 +139,15 @@ public class NEBCommands {
                         }))
                 )
         ));
-    }
 
-    private static void createPresharedChunkBundle(CommandContext<CommandSourceStack> context, @Nullable Path path) {
-        MinecraftServer server = context.getSource().getServer();
-        if (path == null) {
-            path = PresharedChunkServer.locatePresharedChunkBundle(server);
-        } else if (Files.exists(path)) {
-            context.getSource().sendSystemMessage(Component.translatable("neb.preshared.create.failed"));
-            throw new RuntimeException("Bundle already existed: " + path);
+        if (!FMLEnvironment.isProduction()) {
+            event.getDispatcher().register(Commands.literal("teacon").then(Commands.literal("neb")
+                    .then(Commands.literal("debug").executes(context -> {
+                        Reference.reachabilityFence(context);
+                        return Command.SINGLE_SUCCESS;
+                    }))
+            ));
         }
-
-        PresharedChunkServer.create(server, path)
-                .whenCompleteAsync((_, exception) -> {
-                    if (exception == null) {
-                        context.getSource().sendSystemMessage(Component.translatable("neb.preshared.create.success"));
-                    } else {
-                        context.getSource().sendSystemMessage(Component.translatable("neb.preshared.create.failed"));
-                    }
-                }, server);
-    }
-
-    private static int reloadPresharedChunks(CommandContext<CommandSourceStack> context, boolean load) {
-        MinecraftServer server = context.getSource().getServer();
-
-        List<ServerPlayer> players = server.getPlayerList().getPlayers();
-        for (int i = players.size() - 1; i >= 0; i--) {
-            players.get(i).connection.disconnect(Component.translatable("neb.preshared.create.connect_again"));
-        }
-
-        try {
-            if (load) {
-                PresharedChunkServer.load(server);
-            } else {
-                PresharedChunkServer.unload();
-            }
-        } catch (IOException e) {
-            LOGGER.warn("Cannot load preshared-chunk data.", e);
-            return -2;
-        }
-
-        server.sendSystemMessage(Component.translatable("neb.preshared.create.connect_again"));
-        return Command.SINGLE_SUCCESS;
     }
 
     private record SimpleProfileResult(String body) implements CustomPacketPayload {

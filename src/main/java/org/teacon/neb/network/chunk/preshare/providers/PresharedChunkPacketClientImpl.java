@@ -10,10 +10,8 @@ import net.minecraft.network.protocol.game.ClientboundLightUpdatePacketData;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NullMarked;
-import org.teacon.neb.network.chunk.cache.CachedChunkDebugOverlay;
 import org.teacon.neb.network.chunk.preshare.PresharedChunk;
 import org.teacon.neb.network.chunk.preshare.PresharedChunkPacket;
 import org.teacon.neb.network.chunk.preshare.data.BlockEntityInfo;
@@ -77,7 +75,7 @@ public class PresharedChunkPacketClientImpl {
         }
     }
 
-    public static ClientboundLevelChunkWithLightPacket buildVanillaChunkPacket(PresharedChunkPacket packet, PresharedChunk base) {
+    public static ClientboundLevelChunkWithLightPacket makeVanillaChunkPacket(PresharedChunkPacket packet, PresharedChunk base) {
         ChunkPos pos = base.pos();
         ClientboundLevelChunkPacketData chunk = applyChunk(packet, base);
         ClientboundLightUpdatePacketData light = applyLight(packet, base);

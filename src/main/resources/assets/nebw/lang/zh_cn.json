@@ -5,9 +5,5 @@
   "neb.profiler.server.stop": "服务端网络分析器已停止，正在保存结果……",
   "neb.profiler.result": "分析结果已保存至 %1$s",
 
-  "neb.preshared.create.working": "正在创建预共享区块包，世界可能会短暂卡顿……",
-  "neb.preshared.create.failed": "无法创建预共享区块包，请查看日志获取详细信息。",
-  "neb.preshared.create.success": "预共享区块包创建成功。使用“/teacon neb preshared reload”进行热切换。",
-  "neb.preshared.create.connect_again": "服务器管理员已热切换预共享区块包，请重新连接服务器。",
   "neb.preshared.bundle_missing": "缺少预共享区块包 %1$s，请联系服务器管理员获取帮助！"
 }

@@ -1,6 +1,8 @@
 package org.teacon.neb.mixin;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBundlePacket;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.server.level.ServerLevel;
@@ -15,7 +17,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Unique;
 import org.teacon.neb.network.chunk.preshare.PresharedChunk;
-import org.teacon.neb.network.chunk.preshare.PresharedChunkBundle;
+import org.teacon.neb.network.chunk.preshare.grid.PresharedChunkSource;
 import org.teacon.neb.network.chunk.preshare.providers.PresharedChunkServer;
 import org.teacon.neb.utils.vm.LookupAccess;
 
@@ -43,25 +45,28 @@ public class PlayerChunkSenderMixin {
      */
     @Overwrite
     private static void sendChunk(ServerGamePacketListenerImpl connection, ServerLevel level, LevelChunk chunk) {
-        PresharedChunk preshared = PresharedChunkBundle.getChunk(PresharedChunkServer.lookup, level, chunk.getPos());
-        if (preshared == null) {
-            // Vanilla implementation
-            connection.send(chunk.getAuxLightManager(chunk.getPos()).sendLightDataTo(
-                    new ClientboundLevelChunkWithLightPacket(chunk, level.getLightEngine(), null, null)
-            ));
-        } else {
-            @SuppressWarnings("unchecked")
-            Map<BlockPos, Byte> lights = (Map<BlockPos, Byte>) NEOFORGE_LIGHTS.get(chunk.getAuxLightManager(chunk.getPos()));
-
-            ProfilerFiller profiler = Profiler.get();
-            profiler.push("createChunkDiff");
-            connection.send(new ClientboundBundlePacket(List.of(
-                    preshared.createDiff(chunk).toVanillaClientbound(),
-                    new AuxiliaryLightDataPayload(chunk.getPos(), lights).toVanillaClientbound()
-            )));
-            profiler.pop();
+        Packet<? super ClientGamePacketListener> packet;
+        switch (PresharedChunkServer.makePacket(chunk)) {
+            case null -> packet = new ClientboundLevelChunkWithLightPacket(chunk, level.getLightEngine(), null, null);
+            case PresharedChunkSource.Loaded(PresharedChunk preshared) -> {
+                ProfilerFiller profiler = Profiler.get();
+                profiler.push("createChunkDiff");
+                packet = preshared.createDiff(chunk).toVanillaClientbound();
+                profiler.pop();
+            }
+            case PresharedChunkSource.Pending pending -> {
+                pending.thenRunAsync(level.getServer(), () -> {
+                    if (connection.player.level() == level && connection.player.getChunkTrackingView().contains(chunk.getPos())) {
+                        connection.chunkSender.markChunkPendingToSend(chunk);
+                    }
+                });
+                return;
+            }
         }
 
+        @SuppressWarnings("unchecked")
+        Map<BlockPos, Byte> lights = (Map<BlockPos, Byte>) NEOFORGE_LIGHTS.get(chunk.getAuxLightManager(chunk.getPos()));
+        connection.send(new ClientboundBundlePacket(List.of(packet, new AuxiliaryLightDataPayload(chunk.getPos(), lights).toVanillaClientbound())));
         level.debugSynchronizers().startTrackingChunk(connection.player, chunk.getPos());
         net.neoforged.neoforge.event.EventHooks.fireChunkSent(connection.player, chunk, level);
     }
