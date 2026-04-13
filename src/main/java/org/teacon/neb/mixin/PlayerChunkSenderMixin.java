@@ -46,7 +46,7 @@ public class PlayerChunkSenderMixin {
     @Overwrite
     private static void sendChunk(ServerGamePacketListenerImpl connection, ServerLevel level, LevelChunk chunk) {
         Packet<? super ClientGamePacketListener> packet;
-        switch (PresharedChunkServer.makePacket(chunk)) {
+        switch (PresharedChunkServer.makePacket(connection.getConnection(), chunk)) {
             case null -> packet = new ClientboundLevelChunkWithLightPacket(chunk, level.getLightEngine(), null, null);
             case PresharedChunkSource.Loaded(PresharedChunk preshared) -> {
                 ProfilerFiller profiler = Profiler.get();
@@ -55,7 +55,7 @@ public class PlayerChunkSenderMixin {
                 profiler.pop();
             }
             case PresharedChunkSource.Pending pending -> {
-                pending.thenRunAsync(level.getServer(), () -> {
+                pending.thenRunAsync(level.getServer(), _ -> {
                     if (connection.player.level() == level && connection.player.getChunkTrackingView().contains(chunk.getPos())) {
                         connection.chunkSender.markChunkPendingToSend(chunk);
                     }

@@ -1,6 +1,7 @@
 package org.teacon.neb.network.chunk.preshare;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
@@ -13,13 +14,15 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import org.jetbrains.annotations.NotNull;
 import org.teacon.neb.NotEnoughBandwidth;
+import org.teacon.neb.network.chunk.preshare.providers.PresharedChunkServer;
 
 @EventBusSubscriber
-public record PresharedChunkRequestPacket(ChunkPos pos) implements CustomPacketPayload {
+public record PresharedChunkRequestPacket(ChunkPos pos, boolean forceVanilla) implements CustomPacketPayload {
     public static final Type<PresharedChunkRequestPacket> TYPE = new Type<>(NotEnoughBandwidth.id("s2c/preshared_chunk_request"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, PresharedChunkRequestPacket> STREAM_CODEC = StreamCodec.composite(
             ChunkPos.STREAM_CODEC, PresharedChunkRequestPacket::pos,
+            ByteBufCodecs.BOOL, PresharedChunkRequestPacket::forceVanilla,
             PresharedChunkRequestPacket::new
     );
 
@@ -40,6 +43,9 @@ public record PresharedChunkRequestPacket(ChunkPos pos) implements CustomPacketP
             if (player.getChunkTrackingView().contains(pos)) {
                 LevelChunk chunk = player.level().getChunkSource().getChunkNow(pos.x(), pos.z());
                 if (chunk != null) {
+                    if (packet.forceVanilla) {
+                        PresharedChunkServer.markForceVanillaChunk(listener.getConnection(), pos);
+                    }
                     listener.chunkSender.markChunkPendingToSend(chunk);
                 }
             }

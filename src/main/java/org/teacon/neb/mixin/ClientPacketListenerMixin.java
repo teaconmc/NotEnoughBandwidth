@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.teacon.neb.network.chunk.cache.CachedChunkDebugOverlay;
+import org.teacon.neb.network.chunk.debug.ChunkReceivingEvent;
 import org.teacon.neb.network.chunk.preshare.providers.PresharedChunkClient;
 
 import java.io.IOException;
@@ -33,10 +33,7 @@ public abstract class ClientPacketListenerMixin extends ClientCommonPacketListen
 
     @Inject(method = "handleLevelChunkWithLight", at = @At("RETURN"))
     private void afterLevelChunkWithLight(ClientboundLevelChunkWithLightPacket packet, CallbackInfo ci) {
-        CachedChunkDebugOverlay.mark(
-                ChunkPos.pack(packet.getX(), packet.getZ()),
-                CachedChunkDebugOverlay.STATE_RECEIVE_CHUNK
-        );
+        ChunkReceivingEvent.VANILLA_RECEIVED.submit(ChunkPos.pack(packet.getX(), packet.getZ()));
     }
 
     @Inject(method = "handleLogin", at = @At("HEAD"))

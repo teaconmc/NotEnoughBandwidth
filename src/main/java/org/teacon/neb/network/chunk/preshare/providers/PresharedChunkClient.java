@@ -1,5 +1,6 @@
 package org.teacon.neb.network.chunk.preshare.providers;
 
+import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
@@ -21,7 +22,7 @@ import net.neoforged.neoforge.network.registration.HandlerThread;
 import org.jspecify.annotations.NullMarked;
 import org.teacon.neb.NEBConfigs;
 import org.teacon.neb.NotEnoughBandwidth;
-import org.teacon.neb.network.chunk.cache.CachedChunkDebugOverlay;
+import org.teacon.neb.network.chunk.debug.ChunkReceivingEvent;
 import org.teacon.neb.network.chunk.preshare.PresharedChunk;
 import org.teacon.neb.network.chunk.preshare.PresharedChunkPacket;
 import org.teacon.neb.network.chunk.preshare.PresharedChunkRequestPacket;
@@ -48,6 +49,11 @@ public class PresharedChunkClient {
     private static final AttributeKey<PresharedChunkSource> SOURCE = AttributeKey.newInstance(NotEnoughBandwidth.id("preshared_chunk_source").toString());
 
     public static void handleLogin(Connection connection, RegistryAccess registryAccess) throws IOException {
+        Attribute<PresharedChunkSource> sourceAttribute = connection.channel().attr(SOURCE);
+        if (sourceAttribute.get() != null) {
+            return;
+        }
+
         List<IPresharedChunkSource> sources = new ArrayList<>(2);
 
         String version = NEBConfigs.PRESHARED_CHUNK_STATIC_DISPATCH_VERSION.get();
@@ -84,7 +90,7 @@ public class PresharedChunkClient {
         if (sources.isEmpty()) {
             return;
         }
-        connection.channel().attr(SOURCE).set(new PresharedChunkSource(
+        sourceAttribute.set(new PresharedChunkSource(
                 registryAccess,
                 PresharedChunksIO.ofExecutorService(Runtime.getRuntime().availableProcessors(), "Client Chunk Decompressor [Native]"),
                 sources
@@ -109,18 +115,30 @@ public class PresharedChunkClient {
             PresharedChunkSource source = context.connection().channel().attr(SOURCE).get();
             if (source == null || (player != null && player.level().dimension() != Level.OVERWORLD)) {
                 context.disconnect(Component.literal("Receiving unknown preshared-chunks: " + packet.pos()));
-                throw new IllegalStateException("Receiving unknown preshared-chunks.");
+                return;
             }
 
             PresharedChunk chunk;
-            switch (source.load(packet.pos().pack())) {
+            long pos = packet.pos().pack();
+            switch (source.load(pos)) {
                 case null -> {
-                    context.disconnect(Component.literal("Receiving unknown preshared-chunks: " + packet.pos()));
-                    throw new IllegalStateException("Receiving unknown preshared-chunks.");
+                    context.enqueueWork(() -> ChunkReceivingEvent.VANILLA_REQUEST.submit(pos));
+                    context.reply(new PresharedChunkRequestPacket(packet.pos(), true));
+                    return;
                 }
                 case PresharedChunkSource.Loaded(PresharedChunk c) -> chunk = c;
                 case PresharedChunkSource.Pending pending -> {
-                    pending.thenRunAsync(context.channelHandlerContext().executor(), () -> context.reply(new PresharedChunkRequestPacket(packet.pos())));
+                    pending.thenRunAsync(
+                            context.channelHandlerContext().executor(),
+                            success -> {
+                                context.reply(new PresharedChunkRequestPacket(packet.pos(), !success));
+                                if (success) {
+                                    context.enqueueWork(() -> ChunkReceivingEvent.PRESHARED_REQUEST.submit(pos));
+                                } else {
+                                    context.enqueueWork(() -> ChunkReceivingEvent.VANILLA_REQUEST.submit(pos));
+                                }
+                            }
+                    );
                     return;
                 }
             }
@@ -140,13 +158,14 @@ public class PresharedChunkClient {
 
     private static void handle(PresharedChunkPacket packet, PresharedChunk chunk, IPayloadContext context, LocalPlayer player) {
         if (player.level().dimension() != Level.OVERWORLD) {
-            throw new IllegalStateException("Receiving unknown preshared-chunks.");
+            context.disconnect(Component.literal("Receiving unknown preshared-chunks: " + packet.pos()));
+            return;
         }
 
         ClientboundLevelChunkWithLightPacket pkt = PresharedChunkPacketClientImpl.makeVanillaChunkPacket(packet, chunk);
         context.enqueueWork(() -> {
             context.handle(pkt);
-            CachedChunkDebugOverlay.mark(ChunkPos.pack(pkt.getX(), pkt.getZ()), CachedChunkDebugOverlay.STATE_RECEIVE_PRESHARED_CHUNK);
+            ChunkReceivingEvent.PRESHARED_RECEIVED.submit(ChunkPos.pack(pkt.getX(), pkt.getZ()));
         });
     }
 }
