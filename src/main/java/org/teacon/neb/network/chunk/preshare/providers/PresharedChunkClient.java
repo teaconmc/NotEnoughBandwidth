@@ -101,7 +101,7 @@ public class PresharedChunkClient {
         }
         sourceAttribute.set(new PresharedChunkSource(
                 registryAccess,
-                PresharedChunksIO.ofExecutorService(Runtime.getRuntime().availableProcessors(), "Client Chunk Decompressor [Native]"),
+                PresharedChunksIO.ofExecutorService("Client Chunk Decompressor [Native]"),
                 sources
         ));
     }

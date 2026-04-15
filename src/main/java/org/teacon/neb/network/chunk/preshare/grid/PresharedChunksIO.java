@@ -13,6 +13,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.neoforged.neoforge.network.connection.ConnectionType;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.teacon.neb.network.aggregate.compress.CompressContext;
 import org.teacon.neb.network.chunk.preshare.PresharedChunk;
 import org.teacon.neb.network.chunk.preshare.data.BlockEntityInfo;
@@ -33,15 +35,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinWorkerThread;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.teacon.neb.utils.GridPos.GRID_SIZE;
 
 public final class PresharedChunksIO {
+    private static final Logger LOGGER = LoggerFactory.getLogger(PresharedChunksIO.class);
+
     private PresharedChunksIO() {
     }
 
@@ -75,24 +78,20 @@ public final class PresharedChunksIO {
         CompletableFuture<Void> future = new CompletableFuture<>();
         ServerLevel overworld = server.overworld();
         LongSet scheduled = new LongOpenHashSet();
-        int count = Runtime.getRuntime().availableProcessors();
-        ExecutorService executor = ofExecutorService(count, "Chunk Compressor [Native]");
+        ThreadPoolExecutor executor = ofExecutorService("Server Chunk Compressor [Native]");
         AtomicInteger pending = new AtomicInteger(0);
 
-        pollTasks(directory, chunks, pending, count, scheduled, overworld, executor, server, future);
+        pollTasks(directory, chunks, pending, scheduled, overworld, executor, server, future);
         return future;
     }
 
-    public static ForkJoinPool ofExecutorService(int count, String name) {
-        return new ForkJoinPool(
-                count * 2,
-                pool -> {
-                    ForkJoinWorkerThread thread = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(pool);
-                    thread.setName("NEB " + name);
-                    thread.setDaemon(true);
-                    return thread;
-                },
-                null, true
+    public static ThreadPoolExecutor ofExecutorService(String name) {
+        int count = Runtime.getRuntime().availableProcessors();
+        return new ThreadPoolExecutor(
+                0, count,
+                30, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(),
+                Thread.ofPlatform().name("NEB " + name).daemon().factory()
         );
     }
 
@@ -100,14 +99,13 @@ public final class PresharedChunksIO {
             Path directory,
             LongIterator chunks,
             AtomicInteger pending,
-            int count,
             LongSet scheduled,
             ServerLevel overworld,
-            ExecutorService executor,
+            ThreadPoolExecutor executor,
             MinecraftServer server,
             CompletableFuture<Void> future
     ) {
-        while (pending.get() < count * 4 && chunks.hasNext()) {
+        while (pending.get() < executor.getMaximumPoolSize() * 4 && chunks.hasNext()) {
             GridPos grid = GridPos.fromChunk(ChunkPos.unpack(chunks.nextLong()));
             long gridXZ = grid.pack();
             if (scheduled.contains(gridXZ)) {
@@ -124,9 +122,14 @@ public final class PresharedChunksIO {
 
             pending.getAndIncrement();
             executor.submit(() -> {
-                write(directory.resolve(PresharedChunkLocalSource.getName(gridXZ)), gridXZ, value, server.registryAccess());
-                if (pending.decrementAndGet() < count * 4) {
-                    server.execute(() -> pollTasks(directory, chunks, pending, count, scheduled, overworld, executor, server, future));
+                try {
+                    write(directory.resolve(PresharedChunkLocalSource.getName(gridXZ)), gridXZ, value, server.registryAccess());
+                } catch (Throwable t) {
+                    LOGGER.error("Cannot create preshared chunks for grid: {}", GridPos.unpack(gridXZ), t);
+                }
+
+                if (pending.decrementAndGet() < executor.getMaximumPoolSize() * 4) {
+                    server.execute(() -> pollTasks(directory, chunks, pending, scheduled, overworld, executor, server, future));
                 }
             });
         }

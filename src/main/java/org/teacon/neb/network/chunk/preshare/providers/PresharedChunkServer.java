@@ -43,7 +43,7 @@ public class PresharedChunkServer {
 
         source = new PresharedChunkSource(
                 server.registryAccess(),
-                PresharedChunksIO.ofExecutorService(Runtime.getRuntime().availableProcessors(), "Server Chunk Decompressor [Native]"),
+                PresharedChunksIO.ofExecutorService("Server Chunk Decompressor [Native]"),
                 new PresharedChunkLocalSource(directory)
         );
     }
