@@ -1,8 +1,10 @@
 package org.teacon.neb.network.chunk.preshare.providers;
 
+import io.netty.channel.Channel;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.network.Connection;
@@ -19,7 +21,10 @@ import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.HandlerThread;
+import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NullMarked;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.teacon.neb.NEBConfigs;
 import org.teacon.neb.NotEnoughBandwidth;
 import org.teacon.neb.network.chunk.debug.ChunkReceivingEvent;
@@ -40,12 +45,16 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 @EventBusSubscriber(Dist.CLIENT)
 @NullMarked
 public class PresharedChunkClient {
+    private static final Logger LOGGER = LoggerFactory.getLogger(PresharedChunkClient.class);
+
     private static final AttributeKey<PresharedChunkSource> SOURCE = AttributeKey.newInstance(NotEnoughBandwidth.id("preshared_chunk_source").toString());
 
     public static void handleLogin(Connection connection, RegistryAccess registryAccess) throws IOException {
@@ -120,8 +129,8 @@ public class PresharedChunkClient {
 
             PresharedChunk chunk;
             long pos = packet.pos().pack();
-            switch (source.load(pos)) {
-                case null -> {
+            switch (source.load(pos, true)) {
+                case PresharedChunkSource.Empty _, PresharedChunkSource.Failed _ -> {
                     context.enqueueWork(() -> ChunkReceivingEvent.VANILLA_REQUEST.submit(pos));
                     context.reply(new PresharedChunkRequestPacket(packet.pos(), true));
                     return;
@@ -167,5 +176,89 @@ public class PresharedChunkClient {
             context.handle(pkt);
             ChunkReceivingEvent.PRESHARED_RECEIVED.submit(ChunkPos.pack(pkt.getX(), pkt.getZ()));
         });
+    }
+
+    public static CompletableFuture<Snapshot> takeSnapshot(int chunkX1, int chunkX2, int chunkZ1, int chunkZ2, @Nullable Snapshot previous) {
+        ClientPacketListener listener = Minecraft.getInstance().getConnection();
+        if (listener != null) {
+            Channel channel = listener.getConnection().channel();
+            Snapshot snapshot = new Snapshot(chunkX1, chunkX2, chunkZ1, chunkZ2, previous);
+            return CompletableFuture.supplyAsync(() -> {
+                PresharedChunkSource source = channel.attr(SOURCE).get();
+                if (source == null) {
+                    throw new IllegalStateException("Preshared Chunks are NOT loaded.");
+                }
+
+                for (int x = chunkX1; x <= chunkX2; x++) {
+                    for (int z = chunkZ1; z <= chunkZ2; z++) {
+                        try {
+                            snapshot.put(x, z, switch (source.load(ChunkPos.pack(x, z), false)) {
+                                case PresharedChunkSource.Empty _ -> Snapshot.Type.EMPTY;
+                                case PresharedChunkSource.Pending _ -> Snapshot.Type.LOADING;
+                                case PresharedChunkSource.Failed _ -> Snapshot.Type.FAILED;
+                                case PresharedChunkSource.Loaded _ -> Snapshot.Type.LOADED;
+                            });
+                        } catch (RuntimeException e) {
+                            if (LOGGER.isWarnEnabled()) {
+                                LOGGER.warn("Cannot take snapshot of chunk [{}, {}].", chunkX1, chunkX2, e);
+                            }
+                        }
+                    }
+                }
+
+                return snapshot;
+            }, channel.eventLoop());
+        }
+        return CompletableFuture.failedFuture(new IllegalStateException("Preshared Chunks are NOT loaded."));
+    }
+
+    public static final class Snapshot {
+        private final int chunkX1, chunkX2, chunkZ1, chunkZ2;
+        private final byte[] buffer;
+
+        public enum Type {
+            UNKNOWN, EMPTY, LOADING, LOADED, FAILED;
+
+            private static final Type[] VALUES = values();
+        }
+
+        public Snapshot(int chunkX1, int chunkX2, int chunkZ1, int chunkZ2, @Nullable Snapshot previous) {
+            this.chunkX1 = chunkX1;
+            this.chunkX2 = chunkX2;
+            this.chunkZ1 = chunkZ1;
+            this.chunkZ2 = chunkZ2;
+
+            int size = (chunkX2 - chunkX1 + 1) * (chunkZ2 - chunkZ1 + 1);
+            if (previous != null && previous.buffer.length >= size && previous.buffer.length <= size * 4) {
+                this.buffer = previous.buffer;
+                Arrays.fill(this.buffer, 0, size, (byte) Type.UNKNOWN.ordinal());
+            } else {
+                this.buffer = new byte[size];
+            }
+        }
+
+        private int computeIndex(int chunkX, int chunkZ) {
+            if (chunkX < chunkX1 || chunkX > chunkX2 || chunkZ < chunkZ1 || chunkZ > chunkZ2) {
+                return -1;
+            }
+
+            return (chunkX - chunkX1) * (chunkX2 - chunkX1 + 1) + (chunkZ - chunkZ1);
+        }
+
+        private void put(int chunkX, int chunkZ, Type type) {
+            int index = computeIndex(chunkX, chunkZ);
+            if (index == -1) {
+                throw new IndexOutOfBoundsException(String.format("Chunk (%d, %d) is out of bound [(%d, %d), (%d, %d)]", chunkX, chunkZ, chunkX1, chunkZ1, chunkX2, chunkZ2));
+            }
+            buffer[index] = (byte) type.ordinal();
+        }
+
+        public Type get(int chunkX, int chunkZ) {
+            int index = computeIndex(chunkX, chunkZ);
+            if (index == -1) {
+                return Type.UNKNOWN;
+            }
+            return Type.VALUES[buffer[index]];
+        }
     }
 }

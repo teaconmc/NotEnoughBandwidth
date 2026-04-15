@@ -20,9 +20,13 @@ import net.neoforged.neoforge.client.gui.GuiLayer;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.teacon.neb.NotEnoughBandwidth;
+import org.teacon.neb.network.chunk.preshare.providers.PresharedChunkClient;
 import org.teacon.neb.utils.vm.LookupAccess;
 
 import java.lang.invoke.VarHandle;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 @EventBusSubscriber(Dist.CLIENT)
@@ -95,18 +99,44 @@ public final class ClientChunkDebugOverlay implements GuiLayer {
         int xStart = graphics.guiWidth() - viewRange * CELL_STEP;
         int yStart = graphics.guiHeight() - viewRange * CELL_STEP;
 
+        renderHints(graphics, yStart, minecraft, xStart);
+        renderChunks(graphics, xStart, yStart, minecraft, chunkRadius, viewCenterX, viewCenterZ, chunks, viewRange);
+
+        profiler.pop();
+    }
+
+    private void renderHints(@NonNull GuiGraphicsExtractor graphics, int yStart, Minecraft minecraft, int xStart) {
         int hintLines = Math.ceilDiv(HINTS.length, 2);
         for (int i = 0; i < hintLines; i++) {
             int y = yStart - CELL_GAP - hintLines * minecraft.font.lineHeight + i * minecraft.font.lineHeight;
             graphics.textRenderer().accept(xStart, y, HINTS[i]);
             graphics.textRenderer().accept((xStart + graphics.guiWidth()) / 2, y, HINTS[i + hintLines]);
         }
+    }
+
+    private PresharedChunkClient.@Nullable Snapshot presharedChunks = null;
+    private long chunkTimestamp;
+    private CompletableFuture<PresharedChunkClient.Snapshot> chunkFuture = CompletableFuture.failedFuture(new RuntimeException());
+
+    private void renderChunks(@NonNull GuiGraphicsExtractor graphics, int xStart, int yStart, Minecraft minecraft, int chunkRadius, int viewCenterX, int viewCenterZ, AtomicReferenceArray<@Nullable LevelChunk> chunks, int viewRange) {
+        ChunkPos center = Objects.requireNonNull(minecraft.player).chunkPosition();
+
+        if (chunkTimestamp <= System.currentTimeMillis() - 200) {
+            PresharedChunkClient.Snapshot previous = presharedChunks;
+            presharedChunks = chunkFuture.state() == Future.State.SUCCESS ? chunkFuture.resultNow() : null;
+
+            int centerX = center.x(), centerZ = center.z(), radius = chunkRadius + 1;
+            chunkTimestamp = System.currentTimeMillis();
+            chunkFuture = PresharedChunkClient.takeSnapshot(
+                    centerX - radius, centerX + radius,
+                    centerZ - radius, centerZ + radius,
+                    previous
+            );
+        }
 
         graphics.fill(xStart - CELL_GAP, yStart - CELL_GAP, graphics.guiWidth(), graphics.guiHeight(), 0xC0000000);
-
-        ChunkPos chunkPos = minecraft.player.chunkPosition();
-        for (int x0 = chunkPos.x() - chunkRadius, x = x0; x < chunkPos.x() + chunkRadius; x++) {
-            for (int z0 = chunkPos.z() - chunkRadius, z = z0; z < chunkPos.z() + chunkRadius; z++) {
+        for (int x0 = center.x() - chunkRadius, x = x0; x < center.x() + chunkRadius; x++) {
+            for (int z0 = center.z() - chunkRadius, z = z0; z < center.z() + chunkRadius; z++) {
                 int color = computeColor(x, z, viewCenterX, viewCenterZ, chunks, viewRange);
                 if (color != 0) {
                     int xCellStart = xStart + (x - x0) * CELL_STEP;
@@ -115,8 +145,6 @@ public final class ClientChunkDebugOverlay implements GuiLayer {
                 }
             }
         }
-
-        profiler.pop();
     }
 
     private static final int ALPHA_CHANNEL = 0xC0000000;
@@ -136,7 +164,14 @@ public final class ClientChunkDebugOverlay implements GuiLayer {
             return ChunkReceivingEvent.StaticColors.LOADED | ALPHA_CHANNEL;
         }
 
-        // TODO: Display status of preshared chunks.
+        if (presharedChunks != null) {
+            return switch (presharedChunks.get(x, z)) {
+                case LOADING -> ChunkReceivingEvent.StaticColors.PRESHARED_LOADING | ALPHA_CHANNEL;
+                case LOADED -> ChunkReceivingEvent.StaticColors.PRESHARED_READY | ALPHA_CHANNEL;
+                default -> 0;
+            };
+        }
+
         return 0;
     }
 }

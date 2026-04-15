@@ -47,7 +47,8 @@ public class PlayerChunkSenderMixin {
     private static void sendChunk(ServerGamePacketListenerImpl connection, ServerLevel level, LevelChunk chunk) {
         Packet<? super ClientGamePacketListener> packet;
         switch (PresharedChunkServer.makePacket(connection.getConnection(), chunk)) {
-            case null -> packet = new ClientboundLevelChunkWithLightPacket(chunk, level.getLightEngine(), null, null);
+            case PresharedChunkSource.Empty _, PresharedChunkSource.Failed _ ->
+                    packet = new ClientboundLevelChunkWithLightPacket(chunk, level.getLightEngine(), null, null);
             case PresharedChunkSource.Loaded(PresharedChunk preshared) -> {
                 ProfilerFiller profiler = Profiler.get();
                 profiler.push("createChunkDiff");

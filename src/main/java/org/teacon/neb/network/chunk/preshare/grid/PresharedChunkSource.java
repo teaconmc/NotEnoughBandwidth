@@ -72,7 +72,15 @@ public final class PresharedChunkSource {
     public sealed interface IResult {
     }
 
+    public record Empty() implements IResult {
+        public static final Empty INSTANCE = new Empty();
+    }
+
     public record Loaded(PresharedChunk chunk) implements IResult {
+    }
+
+    public record Failed() implements IResult {
+        public static final Failed INSTANCE = new Failed();
     }
 
     public static final class Pending implements IResult {
@@ -94,12 +102,6 @@ public final class PresharedChunkSource {
         }
     }
 
-    @Nullable
-    public IResult load(long pos) {
-        return load(pos, true);
-    }
-
-    @Nullable
     public IResult load(long pos, boolean shouldSchedule) {
         if (!FMLEnvironment.isProduction() && Thread.currentThread() != managedThread) {
             throw new IllegalMonitorStateException(Objects.toIdentityString(this) + " is managed by " + managedThread);
@@ -113,7 +115,7 @@ public final class PresharedChunkSource {
         long gridXZ = GridPos.fromChunk(ChunkPos.unpack(pos)).pack();
         MemorySegment segment = cacheL2.get(gridXZ);
         if (segment == MemorySegment.NULL) {
-            return null;
+            return Empty.INSTANCE;
         }
 
         @Nullable Request request = futures.get(gridXZ);
@@ -125,20 +127,20 @@ public final class PresharedChunkSource {
 
                 RequestResponse result = request.future.resultNow();
                 cacheL2.putIfAbsent(gridXZ, result == null ? MemorySegment.NULL : result.segment);
-                return result == null ? null : new Loaded(liftL2(pos, result.chunks));
+                return result == null ? Empty.INSTANCE : new Loaded(liftL2(pos, result.chunks));
             }
             case RUNNING -> {
                 return new Pending(request.future, managedThread);
             }
             case FAILED, CANCELLED -> {
                 if (request.timestamp >= System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(FAIL_RETRY)) {
-                    return null;
+                    return Failed.INSTANCE;
                 }
             }
         }
 
         if (!shouldSchedule) {
-            return null;
+            return Empty.INSTANCE;
         }
         request = prepareL3(segment, gridXZ);
         futures.put(gridXZ, request);

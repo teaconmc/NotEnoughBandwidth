@@ -66,10 +66,9 @@ public class PresharedChunkServer {
         chunks.add(pos.pack());
     }
 
-    @Nullable
     public static PresharedChunkSource.IResult makePacket(Connection connection, LevelChunk chunk) {
         if (chunk.getLevel().dimension() != Level.OVERWORLD || source == null) {
-            return null;
+            return PresharedChunkSource.Empty.INSTANCE;
         }
 
         long pos = chunk.getPos().pack();
@@ -79,10 +78,10 @@ public class PresharedChunkServer {
             int index = chunks.indexOf(pos);
             if (index >= 0) {
                 chunks.removeLong(index);
-                return null;
+                return PresharedChunkSource.Empty.INSTANCE;
             }
         }
 
-        return source.load(pos);
+        return source.load(pos, true);
     }
 }
