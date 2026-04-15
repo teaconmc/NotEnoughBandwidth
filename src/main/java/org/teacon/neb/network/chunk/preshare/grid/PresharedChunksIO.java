@@ -29,11 +29,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -80,6 +82,14 @@ public final class PresharedChunksIO {
         LongSet scheduled = new LongOpenHashSet();
         ThreadPoolExecutor executor = ofExecutorService("Server Chunk Compressor [Native]");
         AtomicInteger pending = new AtomicInteger(0);
+
+        executor.submit(() -> {
+            try {
+                Files.writeString(PresharedChunkLocalSource.resolveIndex(directory), UUID.randomUUID().toString(), StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                LOGGER.error("Cannot write index file.", e);
+            }
+        });
 
         pollTasks(directory, chunks, pending, scheduled, overworld, executor, server, future);
         return future;

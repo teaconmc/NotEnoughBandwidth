@@ -15,14 +15,18 @@ public final class PresharedChunkLocalSource implements IPresharedChunkSource {
         this.directory = directory;
     }
 
-    public static String getName(long grid) {
-        return ChunkPos.getX(grid) + "_" + ChunkPos.getZ(grid) + ".grid.neb";
-    }
-
     @Nullable
     @Override
     public Path tryLoad(long grid) {
         Path path = directory.resolve(getName(grid));
         return Files.isReadable(path) ? path : null;
+    }
+
+    public static String getName(long grid) {
+        return ChunkPos.getX(grid) + "," + ChunkPos.getZ(grid) + ".grid.neb";
+    }
+
+    public static Path resolveIndex(Path directory) {
+        return directory.resolve("index");
     }
 }

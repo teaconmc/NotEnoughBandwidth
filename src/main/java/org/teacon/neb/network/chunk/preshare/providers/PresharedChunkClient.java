@@ -31,6 +31,7 @@ import org.teacon.neb.network.chunk.debug.ChunkReceivingEvent;
 import org.teacon.neb.network.chunk.preshare.PresharedChunk;
 import org.teacon.neb.network.chunk.preshare.PresharedChunkPacket;
 import org.teacon.neb.network.chunk.preshare.PresharedChunkRequestPacket;
+import org.teacon.neb.network.chunk.preshare.PresharedChunkVersionPacket;
 import org.teacon.neb.network.chunk.preshare.grid.PresharedChunkSource;
 import org.teacon.neb.network.chunk.preshare.grid.PresharedChunksIO;
 import org.teacon.neb.network.chunk.preshare.grid.repos.IPresharedChunkSource;
@@ -42,6 +43,8 @@ import java.net.Proxy;
 import java.net.ProxySelector;
 import java.net.SocketAddress;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -55,6 +58,7 @@ import java.util.concurrent.CompletableFuture;
 public class PresharedChunkClient {
     private static final Logger LOGGER = LoggerFactory.getLogger(PresharedChunkClient.class);
 
+    private static final AttributeKey<String> SOURCE_VERSION = AttributeKey.newInstance(NotEnoughBandwidth.id("preshared_chunk_source_version").toString());
     private static final AttributeKey<PresharedChunkSource> SOURCE = AttributeKey.newInstance(NotEnoughBandwidth.id("preshared_chunk_source").toString());
 
     public static void handleLogin(Connection connection, RegistryAccess registryAccess) throws IOException {
@@ -65,17 +69,10 @@ public class PresharedChunkClient {
 
         List<IPresharedChunkSource> sources = new ArrayList<>(2);
 
-        String version = NEBConfigs.PRESHARED_CHUNK_STATIC_DISPATCH_VERSION.get();
-        if (!version.isEmpty()) {
-            Path root = Minecraft.getInstance().gameDirectory.toPath().resolve("preshared-chunks");
-            Path path = root.resolve(version).normalize();
-            if (!Files.isDirectory(path)) {
-                connection.disconnect(Component.translatable("neb.preshared.bundle_missing", version));
-                return;
-            }
-            path = path.toRealPath();
-            if (!path.startsWith(root.toRealPath())) {
-                connection.disconnect(Component.translatable("neb.preshared.bundle_missing", version));
+        String version = connection.channel().attr(SOURCE_VERSION).get();
+        if (version != null && !version.isEmpty()) {
+            Path path = locatePresharedDirectory(connection, version);
+            if (path == null) {
                 return;
             }
 
@@ -117,8 +114,33 @@ public class PresharedChunkClient {
         }
     }
 
+    @Nullable
+    private static Path locatePresharedDirectory(Connection connection, String version) throws IOException {
+        Path root = Minecraft.getInstance().gameDirectory.toPath().resolve("preshared-chunks");
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(root)) {
+            for (Path edition : stream) {
+                if (Files.isDirectory(edition)) {
+                    Path index = PresharedChunkLocalSource.resolveIndex(edition);
+                    if (Files.isReadable(index) && version.equals(Files.readString(index, StandardCharsets.UTF_8))) {
+                        Path path = edition.normalize().toRealPath();
+                        if (path.startsWith(root.toRealPath())) {
+                            return path;
+                        }
+                    }
+                }
+            }
+        }
+
+        connection.disconnect(Component.translatable("neb.preshared.bundle_missing", version));
+        return null;
+    }
+
     @SubscribeEvent
     private static void on(RegisterClientPayloadHandlersEvent event) {
+        event.register(PresharedChunkVersionPacket.TYPE, (packet, context) -> {
+            context.connection().channel().attr(SOURCE_VERSION).set(packet.version());
+        });
+
         event.register(PresharedChunkPacket.TYPE, HandlerThread.NETWORK, (packet, context) -> {
             LocalPlayer player = PresharedChunkPacketClientImpl.getLocalPlayer();
             PresharedChunkSource source = context.connection().channel().attr(SOURCE).get();
