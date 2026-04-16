@@ -134,6 +134,10 @@ public final class CompressContext implements AutoCloseable {
             return compressed.readBytes(compressed.readableBytes());
         }
 
+        if (size >= 16 * 1024 * 1024) {
+            throw new IllegalStateException("Frame is too big: " + size);
+        }
+
         int s2;
         ByteBuf original = compressed.alloc().directBuffer(size, size);
         if (compressed.isDirect()) {
