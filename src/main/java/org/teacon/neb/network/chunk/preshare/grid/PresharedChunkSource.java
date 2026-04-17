@@ -20,10 +20,10 @@ import org.teacon.neb.utils.GridPos;
 import java.io.IOException;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
+import java.lang.ref.WeakReference;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -41,6 +41,7 @@ public final class PresharedChunkSource {
     private final ExecutorService decompressor;
     private final List<IPresharedChunkSource> sources;
     private final RegistryAccess registryAccess;
+    private final Executor managedThreadIdeExecutor;
     private final Thread managedThread = Thread.currentThread();
 
     private final Arena ARENA = Arena.ofShared();
@@ -59,11 +60,8 @@ public final class PresharedChunkSource {
     /// grid_pos -> async request
     private final Long2ObjectLinkedOpenHashMap<Request> futures = new Long2ObjectLinkedOpenHashMap<>();
 
-    public PresharedChunkSource(RegistryAccess registryAccess, ExecutorService decompressor, IPresharedChunkSource... sources) {
-        this(registryAccess, decompressor, Arrays.asList(sources));
-    }
-
-    public PresharedChunkSource(RegistryAccess registryAccess, ExecutorService decompressor, List<IPresharedChunkSource> sources) {
+    public PresharedChunkSource(Executor managedThreadIdeExecutor, RegistryAccess registryAccess, ExecutorService decompressor, List<IPresharedChunkSource> sources) {
+        this.managedThreadIdeExecutor = managedThreadIdeExecutor;
         this.decompressor = decompressor;
         this.sources = sources;
         this.registryAccess = registryAccess;
@@ -126,8 +124,10 @@ public final class PresharedChunkSource {
                 futures.remove(gridXZ);
 
                 RequestResponse result = request.future.resultNow();
-                cacheL2.putIfAbsent(gridXZ, result == null ? MemorySegment.NULL : result.segment);
-                return result == null ? Empty.INSTANCE : new Loaded(liftL2(pos, result.chunks));
+                liftL2(gridXZ, result);
+
+                chunk = cacheL1.get(pos);
+                return chunk == null ? Empty.INSTANCE : new Loaded(chunk);
             }
             case RUNNING -> {
                 return new Pending(request.future, managedThread);
@@ -147,8 +147,14 @@ public final class PresharedChunkSource {
         return new Pending(request.future, managedThread);
     }
 
-    private PresharedChunk liftL2(long pos, List<PresharedChunk> chunks) {
-        int expected = CACHE_L1_MAX - chunks.size();
+    private void liftL2(long gridXZ, @Nullable RequestResponse result) {
+        if (result == null) {
+            cacheL2.putIfAbsent(gridXZ, MemorySegment.NULL);
+            return;
+        }
+        cacheL2.putIfAbsent(gridXZ, result.segment);
+
+        int expected = CACHE_L1_MAX - result.chunks.size();
         if (expected <= 0) {
             cacheL1.clear();
         } else {
@@ -157,16 +163,9 @@ public final class PresharedChunkSource {
             }
         }
 
-        for (PresharedChunk chunk : chunks) {
+        for (PresharedChunk chunk : result.chunks) {
             cacheL1.put(chunk.pos().pack(), chunk);
         }
-
-        for (PresharedChunk chunk : chunks) {
-            if (chunk.pos().pack() == pos) {
-                return chunk;
-            }
-        }
-        throw new IllegalStateException("Cannot load chunk from cacheL2: must contain chunk " + ChunkPos.unpack(pos));
     }
 
     private Request prepareL3(@Nullable MemorySegment loadedSegment, long gridXZ) {
@@ -185,7 +184,11 @@ public final class PresharedChunkSource {
                         }
                     }
                 } catch (Exception e) {
-                    LOGGER.warn("Cannot load preshared chunks: {}", GridPos.unpack(gridXZ), e);
+                    if (e instanceof IOException && e.getClass().getName().startsWith("java.net.")) {
+                        LOGGER.warn("Cannot load preshared chunks: {}\n{}", GridPos.unpack(gridXZ), e.toString());
+                    } else {
+                        LOGGER.warn("Cannot load preshared chunks: {}", GridPos.unpack(gridXZ), e);
+                    }
                     throw e instanceof RuntimeException re ? re : new RuntimeException(e);
                 }
                 return null;
@@ -204,7 +207,17 @@ public final class PresharedChunkSource {
             return new RequestResponse(segment, chunks);
         }, decompressor);
 
-        return new Request(System.currentTimeMillis(), parseFuture);
+        Request request = new Request(System.currentTimeMillis(), parseFuture);
+
+        WeakReference<Request> reference = new WeakReference<>(request);
+        parseFuture.thenAcceptAsync(response -> {
+            Request current = reference.get();
+            if (current != null && futures.remove(gridXZ, current)) {
+                liftL2(gridXZ, response);
+            }
+        }, managedThreadIdeExecutor);
+
+        return request;
     }
 
     public void close() {

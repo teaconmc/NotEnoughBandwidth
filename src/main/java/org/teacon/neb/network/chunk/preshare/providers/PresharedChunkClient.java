@@ -97,6 +97,7 @@ public class PresharedChunkClient {
             return;
         }
         sourceAttribute.set(new PresharedChunkSource(
+                Minecraft.getInstance(),
                 registryAccess,
                 PresharedChunksIO.ofExecutorService("Client Chunk Decompressor [Native]"),
                 sources

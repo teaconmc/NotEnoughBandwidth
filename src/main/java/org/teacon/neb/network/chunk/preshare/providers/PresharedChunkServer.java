@@ -7,6 +7,7 @@ import it.unimi.dsi.fastutil.longs.LongList;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.TickTask;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -29,6 +30,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.function.Consumer;
 
 @EventBusSubscriber
@@ -50,9 +52,10 @@ public class PresharedChunkServer {
         }
 
         source = new PresharedChunkSource(
+                event.getServer(),
                 server.registryAccess(),
                 PresharedChunksIO.ofExecutorService("Server Chunk Decompressor [Native]"),
-                new PresharedChunkLocalSource(directory)
+                List.of(new PresharedChunkLocalSource(directory))
         );
         sourceVersion = Files.readString(PresharedChunkLocalSource.resolveIndex(directory), StandardCharsets.UTF_8);
     }

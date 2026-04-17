@@ -168,6 +168,7 @@ public final class ClientChunkDebugOverlay implements GuiLayer {
             return switch (presharedChunks.get(x, z)) {
                 case LOADING -> ChunkReceivingEvent.StaticColors.PRESHARED_LOADING | ALPHA_CHANNEL;
                 case LOADED -> ChunkReceivingEvent.StaticColors.PRESHARED_READY | ALPHA_CHANNEL;
+                case FAILED -> ChunkReceivingEvent.StaticColors.PRESHARED_FAILED | ALPHA_CHANNEL;
                 default -> 0;
             };
         }
