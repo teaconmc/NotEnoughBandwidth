@@ -118,22 +118,29 @@ public final class NEBConfigs {
 
     @SubscribeEvent
     private static void on(ModConfigEvent.Loading event) {
-        updateUserBlacklist(event.getConfig().getSpec());
-        updateViewDistance();
+        updateConfig(event.getConfig().getSpec());
     }
 
     @SubscribeEvent
     private static void on(ModConfigEvent.Reloading event) {
-        updateUserBlacklist(event.getConfig().getSpec());
-        updateViewDistance();
+        updateConfig(event.getConfig().getSpec());
     }
 
-    private static void updateViewDistance() {
+    private static void updateConfig(IConfigSpec spec) {
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
-        if (server != null) {
-            PlayerList playerList = Objects.requireNonNull(server).getPlayerList();
-            playerList.setViewDistance(playerList.getViewDistance() + CHUNK_CACHE_DISTANCE.get());
+        if (spec != CONFIG_SPEC || server == null) {
+            return;
         }
+
+        NetworkManager.USER_BLACK_LIST = ImmutableSet.copyOf(
+                PACKET_BLACKLIST.get().stream()
+                        .map(NEBConfigs::parsePacketDescriptor)
+                        .filter(Objects::nonNull)
+                        .iterator()
+        );
+
+        PlayerList playerList = server.getPlayerList();
+        playerList.setViewDistance(playerList.getViewDistance() + CHUNK_CACHE_DISTANCE.get());
     }
 
     @Nullable
@@ -153,27 +160,4 @@ public final class NEBConfigs {
         return null;
     }
 
-    /// Set the following user black list to make NEB compatible with Velocity.
-    /// ```
-    /// s2c@minecraft:login
-    /// c2s@minecraft:keep_alive
-    /// s2c@minecraft:keep_alive
-    /// s2c@minecraft:command_suggestions
-    /// s2c@minecraft:commands
-    /// c2s@minecraft:chat_command
-    /// c2s@minecraft:client_command
-    /// c2s@minecraft:command_suggestion
-    /// s2c@minecraft:player_info_remove
-    /// s2c@minecraft:player_info_update
-    /// ```
-    private static void updateUserBlacklist(IConfigSpec spec) {
-        if (spec == CONFIG_SPEC) {
-            NetworkManager.USER_BLACK_LIST = ImmutableSet.copyOf(
-                    PACKET_BLACKLIST.get().stream()
-                            .map(NEBConfigs::parsePacketDescriptor)
-                            .filter(Objects::nonNull)
-                            .iterator()
-            );
-        }
-    }
 }
