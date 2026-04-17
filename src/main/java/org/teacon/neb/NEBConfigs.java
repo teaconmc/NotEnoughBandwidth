@@ -27,7 +27,6 @@ import java.util.Objects;
 @SuppressWarnings("NotNullFieldNotInitialized")
 @EventBusSubscriber
 public final class NEBConfigs {
-    private static ModConfigSpec CONFIG_SPEC;
     public static ModConfigSpec.ConfigValue<Integer> COMPRESS_WINDOW_SIZE_LOG;
 
     public static ModConfigSpec.ConfigValue<Integer> CHUNK_CACHE_BUFFER_SIZE;
@@ -36,19 +35,24 @@ public final class NEBConfigs {
 
     public static ModConfigSpec.ConfigValue<String> PRESHARED_CHUNK_DYNAMIC_DISPATCH_URL;
     public static ModConfigSpec.ConfigValue<Integer> PRESHARED_CHUNK_COMPRESS_LEVEL;
+    public static ModConfigSpec.ConfigValue<Integer> PRESHARED_CHUNK_CACHE_L1_MAX;
+    public static ModConfigSpec.ConfigValue<Integer> PRESHARED_CHUNK_RETRY_TIMEOUT;
 
     private static ModConfigSpec.ConfigValue<List<? extends String>> PACKET_BLACKLIST;
 
+    private static List<IConfigSpec> CONFIG_SPECS;
+
     @SubscribeEvent
     private static void on(FMLConstructModEvent event) {
-        ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
-        COMPRESS_WINDOW_SIZE_LOG = builder
+        ModConfigSpec.Builder server = new ModConfigSpec.Builder();
+        ModConfigSpec.Builder common = new ModConfigSpec.Builder();
+        COMPRESS_WINDOW_SIZE_LOG = server
                 .comment(formatComments("""
                         The base-2 logarithm of the compression window size. See: https://www.jefftk.com/p/zstd-window-size
                         """))
                 .defineInRange("zstd.window_log", 20, 19, 27);
 
-        builder.comment(formatComments("""
+        server.comment(formatComments("""
                         Chunk cache is used to temporarily retain chunks that have recently left the major view,
                         in order to reduce frequent enter/leave churn when the player moves near view boundaries.
                         A cached chunk will be evicted if any of the following conditions is met:
@@ -57,49 +61,55 @@ public final class NEBConfigs {
                         - The cache exceeds the configured size limit, in which case the oldest cached chunks are removed first.
                         """))
                 .push("chunk_cache");
-        CHUNK_CACHE_BUFFER_SIZE = builder
+        CHUNK_CACHE_BUFFER_SIZE = server
                 .comment(formatComments("The maximum capacity of the cache queue for recently visited chunks."))
                 .defineInRange("buffer_size", 60, 0, Integer.MAX_VALUE);
-        CHUNK_CACHE_DISTANCE = builder
+        CHUNK_CACHE_DISTANCE = server
                 .comment(formatComments("""
                         The distance threshold in chunks.
                         If the distance between a cached chunk and the player exceeds
                         this value plus the view distance, the chunk will be forgotten.
                         """))
                 .defineInRange("distance", 5, 0, Integer.MAX_VALUE);
-        CHUNK_CACHE_TIMEOUT = builder
+        CHUNK_CACHE_TIMEOUT = server
                 .comment(formatComments("""
                         The time (in seconds) since the client's last visit.
                         If this timeout is exceeded, the cached chunks will be forgotten.
                         """))
                 .defineInRange("timeout", 60, 0, Integer.MAX_VALUE);
-        builder.pop();
+        server.pop();
 
-        builder.comment(formatComments("""
+        server.comment(formatComments("""
                         Dispatch chunks in third-party approaches.
-                        Server loads chunks from static_dispatch, while clients loads chunks in both manner.
                         When syncing chunks, the server sends a small diff instead of full data, reducing network bandwidth usage.
                         """))
                 .push("chunk_cdn");
-        PRESHARED_CHUNK_DYNAMIC_DISPATCH_URL = builder.comment(formatComments("""
+        PRESHARED_CHUNK_DYNAMIC_DISPATCH_URL = server.comment(formatComments("""
                         Loads chunks from remove server, accepting http (DONOT USE THIS IN PRODUCTION SERVER!) and https protocol,
                         with Java String#format styled placeholders for %1$s (version), %2$d (gridX), %3$d (gridZ).
                         Remote server must return this correct data, as there won't be much validation in client sides.
                         Leave it to empty to disable this feature.
                         """))
                 .define("dynamic_dispatch_url", "");
-        PRESHARED_CHUNK_COMPRESS_LEVEL = builder
+        PRESHARED_CHUNK_COMPRESS_LEVEL = server
                 .comment(formatComments("ZSTD compression level for the Preshared Chunk Bundle."))
                 .defineInRange("compress_level", 22, 0, Integer.MAX_VALUE);
-        builder.pop();
+        PRESHARED_CHUNK_CACHE_L1_MAX = common.comment("Cache L1's max size")
+                .define("chunk_cdn.cache_l1_max", 2048);
+        PRESHARED_CHUNK_RETRY_TIMEOUT = server
+                .comment("Seconds to wait before fetching preshared chunks from dynamic_dispatch_url")
+                .define("retry_timeout", 10);
+        server.pop();
 
-        PACKET_BLACKLIST = builder.defineList(
+        PACKET_BLACKLIST = server.defineList(
                 "packet_blacklist", ArrayList::new, () -> "",
                 element -> element instanceof String value && parsePacketDescriptor(value) != null
         );
-        CONFIG_SPEC = builder.build();
 
-        NotEnoughBandwidth.MOD_CONTAINER.registerConfig(ModConfig.Type.SERVER, CONFIG_SPEC);
+        ModConfigSpec serverSpec = server.build(), commonSpec = common.build();
+        NotEnoughBandwidth.MOD_CONTAINER.registerConfig(ModConfig.Type.SERVER, serverSpec);
+        NotEnoughBandwidth.MOD_CONTAINER.registerConfig(ModConfig.Type.COMMON, commonSpec);
+        CONFIG_SPECS = List.of(serverSpec, commonSpec);
     }
 
     @EventBusSubscriber(Dist.CLIENT)
@@ -128,7 +138,7 @@ public final class NEBConfigs {
 
     private static void updateConfig(IConfigSpec spec) {
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
-        if (spec != CONFIG_SPEC || server == null) {
+        if (!CONFIG_SPECS.contains(spec) || server == null) {
             return;
         }
 
@@ -159,5 +169,4 @@ public final class NEBConfigs {
         }
         return null;
     }
-
 }

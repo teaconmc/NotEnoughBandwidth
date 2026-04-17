@@ -12,6 +12,7 @@ import net.neoforged.neoforge.network.connection.ConnectionType;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.teacon.neb.NEBConfigs;
 import org.teacon.neb.network.chunk.preshare.PresharedChunk;
 import org.teacon.neb.network.chunk.preshare.grid.repos.IPresharedChunkSource;
 import org.teacon.neb.utils.ContextByteBuf;
@@ -33,9 +34,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public final class PresharedChunkSource {
-    private static final int CACHE_L1_MAX = 2048;
-    private static final int FAIL_RETRY = 10;
-
     private static final Logger LOGGER = LoggerFactory.getLogger(PresharedChunkSource.class);
 
     private final ExecutorService decompressor;
@@ -133,7 +131,7 @@ public final class PresharedChunkSource {
                 return new Pending(request.future, managedThread);
             }
             case FAILED, CANCELLED -> {
-                if (request.timestamp >= System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(FAIL_RETRY)) {
+                if (request.timestamp >= System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(NEBConfigs.PRESHARED_CHUNK_RETRY_TIMEOUT.get())) {
                     return Failed.INSTANCE;
                 }
             }
@@ -154,7 +152,7 @@ public final class PresharedChunkSource {
         }
         cacheL2.putIfAbsent(gridXZ, result.segment);
 
-        int expected = CACHE_L1_MAX - result.chunks.size();
+        int expected = NEBConfigs.PRESHARED_CHUNK_CACHE_L1_MAX.get() - result.chunks.size();
         if (expected <= 0) {
             cacheL1.clear();
         } else {
