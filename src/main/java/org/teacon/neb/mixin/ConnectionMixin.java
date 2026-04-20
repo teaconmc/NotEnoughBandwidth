@@ -38,6 +38,9 @@ public abstract class ConnectionMixin {
     @Shadow
     private int sentPackets;
 
+    @Shadow
+    private Channel channel;
+
     @Inject(method = "sendPacket", at = @At("HEAD"), cancellable = true)
     private void onSendPacket(Packet<?> packet, @Nullable ChannelFutureListener listener, boolean flush, CallbackInfo ci) {
         Connection self = (Connection) (Object) this;
@@ -51,7 +54,9 @@ public abstract class ConnectionMixin {
 
     @Inject(method = "tick", at = @At("HEAD"))
     private void onTick(CallbackInfo ci) {
-        NetworkManager.tick((Connection) (Object) this);
+        if (readChannel(channel) != null) {
+            NetworkManager.tick((Connection) (Object) this);
+        }
     }
 
     @Inject(method = "configureSerialization", at = @At("TAIL"))

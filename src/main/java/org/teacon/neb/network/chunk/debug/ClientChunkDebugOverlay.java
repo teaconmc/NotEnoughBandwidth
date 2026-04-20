@@ -1,6 +1,5 @@
 package org.teacon.neb.network.chunk.debug;
 
-import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.debug.DebugEntryNoop;
@@ -15,8 +14,6 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RegisterDebugEntriesEvent;
-import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
-import net.neoforged.neoforge.client.gui.GuiLayer;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.teacon.neb.NotEnoughBandwidth;
@@ -30,15 +27,10 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 @EventBusSubscriber(Dist.CLIENT)
-public final class ClientChunkDebugOverlay implements GuiLayer {
+public final class ClientChunkDebugOverlay {
     private static final Identifier ID = NotEnoughBandwidth.id("visualize_cached_chunk");
 
     private ClientChunkDebugOverlay() {
-    }
-
-    @SubscribeEvent
-    private static void on(RegisterGuiLayersEvent event) {
-        event.registerAboveAll(ID, new ClientChunkDebugOverlay());
     }
 
     @SubscribeEvent
@@ -77,8 +69,7 @@ public final class ClientChunkDebugOverlay implements GuiLayer {
             Component.literal("Failed x").withColor(ChunkReceivingEvent.StaticColors.PRESHARED_FAILED),
     };
 
-    @Override
-    public void render(@NonNull GuiGraphicsExtractor graphics, @NonNull DeltaTracker deltaTracker) {
+    public static void render(@NonNull GuiGraphicsExtractor graphics) {
         // FIXME: Fucking Mojang use a List to store active debuggers.
         Minecraft minecraft = Minecraft.getInstance();
         if (!minecraft.debugEntries.getCurrentlyEnabled().contains(ID) || minecraft.level == null || minecraft.player == null) {
@@ -105,7 +96,7 @@ public final class ClientChunkDebugOverlay implements GuiLayer {
         profiler.pop();
     }
 
-    private void renderHints(@NonNull GuiGraphicsExtractor graphics, int yStart, Minecraft minecraft, int xStart) {
+    private static void renderHints(@NonNull GuiGraphicsExtractor graphics, int yStart, Minecraft minecraft, int xStart) {
         int hintLines = Math.ceilDiv(HINTS.length, 2);
         for (int i = 0; i < hintLines; i++) {
             int y = yStart - CELL_GAP - hintLines * minecraft.font.lineHeight + i * minecraft.font.lineHeight;
@@ -114,11 +105,11 @@ public final class ClientChunkDebugOverlay implements GuiLayer {
         }
     }
 
-    private PresharedChunkClient.@Nullable Snapshot presharedChunks = null;
-    private long chunkTimestamp;
-    private CompletableFuture<PresharedChunkClient.Snapshot> chunkFuture = CompletableFuture.failedFuture(new RuntimeException());
+    private static PresharedChunkClient.@Nullable Snapshot presharedChunks = null;
+    private static long chunkTimestamp;
+    private static CompletableFuture<PresharedChunkClient.Snapshot> chunkFuture = CompletableFuture.failedFuture(new RuntimeException());
 
-    private void renderChunks(@NonNull GuiGraphicsExtractor graphics, int xStart, int yStart, Minecraft minecraft, int chunkRadius, int viewCenterX, int viewCenterZ, AtomicReferenceArray<@Nullable LevelChunk> chunks, int viewRange) {
+    private static void renderChunks(@NonNull GuiGraphicsExtractor graphics, int xStart, int yStart, Minecraft minecraft, int chunkRadius, int viewCenterX, int viewCenterZ, AtomicReferenceArray<@Nullable LevelChunk> chunks, int viewRange) {
         ChunkPos center = Objects.requireNonNull(minecraft.player).chunkPosition();
 
         if (chunkTimestamp <= System.currentTimeMillis() - 200) {
@@ -149,7 +140,7 @@ public final class ClientChunkDebugOverlay implements GuiLayer {
 
     private static final int ALPHA_CHANNEL = 0xC0000000;
 
-    private int computeColor(int x, int z, int viewCenterX, int viewCenterZ, AtomicReferenceArray<@Nullable LevelChunk> chunks, int viewRange) {
+    private static int computeColor(int x, int z, int viewCenterX, int viewCenterZ, AtomicReferenceArray<@Nullable LevelChunk> chunks, int viewRange) {
         ChunkReceivingEvent event = ChunkReceivingEvent.get(ChunkPos.pack(x, z));
         if (event != null) {
             return event.getColor() | ALPHA_CHANNEL;
