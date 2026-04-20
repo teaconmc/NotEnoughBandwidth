@@ -94,10 +94,10 @@ public final class NEBConfigs {
         PRESHARED_CHUNK_COMPRESS_LEVEL = server
                 .comment(formatComments("ZSTD compression level for the Preshared Chunk Bundle."))
                 .defineInRange("compress_level", 22, 0, Integer.MAX_VALUE);
-        PRESHARED_CHUNK_CACHE_L1_MAX = common.comment("Cache L1's max size")
+        PRESHARED_CHUNK_CACHE_L1_MAX = common.comment(formatComments("Cache L1's max size"))
                 .define("chunk_cdn.cache_l1_max", 2048);
         PRESHARED_CHUNK_RETRY_TIMEOUT = server
-                .comment("Seconds to wait before fetching preshared chunks from dynamic_dispatch_url")
+                .comment(formatComments("Seconds to wait before fetching preshared chunks from dynamic_dispatch_url"))
                 .define("retry_timeout", 10);
         server.pop();
 
