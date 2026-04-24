@@ -56,7 +56,7 @@ public class PlayerChunkSenderMixin {
                 profiler.pop();
             }
             case PresharedChunkSource.Pending pending -> {
-                pending.thenRunAsync(level.getServer(), _ -> {
+                pending.thenRunAsync(_ -> {
                     if (connection.player.level() == level && connection.player.getChunkTrackingView().contains(chunk.getPos())) {
                         connection.chunkSender.markChunkPendingToSend(chunk);
                     }

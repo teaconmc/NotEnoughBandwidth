@@ -32,6 +32,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 public final class PresharedChunkSource {
     private static final Logger LOGGER = LoggerFactory.getLogger(PresharedChunkSource.class);
@@ -42,7 +43,7 @@ public final class PresharedChunkSource {
     private final Executor managedThreadIdeExecutor;
     private final Thread managedThread = Thread.currentThread();
 
-    private final Arena ARENA = Arena.ofShared();
+    private final Arena arena = Arena.ofShared();
 
     /// chunk_pos -> chunk
     private final Long2ObjectLinkedOpenHashMap<PresharedChunk> cacheL1 = new Long2ObjectLinkedOpenHashMap<>();
@@ -79,29 +80,25 @@ public final class PresharedChunkSource {
         public static final Failed INSTANCE = new Failed();
     }
 
-    public static final class Pending implements IResult {
+    public final class Pending implements IResult {
         private final CompletableFuture<?> future;
-        private final Thread desiredThread;
 
-        private Pending(CompletableFuture<?> future, Thread desiredThread) {
+        private Pending(CompletableFuture<?> future) {
             this.future = future;
-            this.desiredThread = desiredThread;
         }
 
-        public void thenRunAsync(Executor executor, BooleanConsumer runnable) {
+        public void thenRunAsync(BooleanConsumer runnable) {
             future.whenCompleteAsync((_, t) -> {
-                if (Thread.currentThread() != desiredThread) {
-                    throw new IllegalArgumentException("Executor doesn't deferred runnable to desired thread: " + desiredThread);
+                assertThread();
+                if (arena.scope().isAlive()) {
+                    runnable.accept(t == null);
                 }
-                runnable.accept(t == null);
-            }, executor);
+            }, managedThreadIdeExecutor);
         }
     }
 
     public IResult load(long pos, boolean shouldSchedule) {
-        if (!FMLEnvironment.isProduction() && Thread.currentThread() != managedThread) {
-            throw new IllegalMonitorStateException(Objects.toIdentityString(this) + " is managed by " + managedThread);
-        }
+        assertThread();
 
         PresharedChunk chunk = cacheL1.getAndMoveToLast(pos);
         if (chunk != null) {
@@ -128,7 +125,7 @@ public final class PresharedChunkSource {
                 return chunk == null ? Empty.INSTANCE : new Loaded(chunk);
             }
             case RUNNING -> {
-                return new Pending(request.future, managedThread);
+                return new Pending(request.future);
             }
             case FAILED, CANCELLED -> {
                 if (request.timestamp >= System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(NEBConfigs.PRESHARED_CHUNK_RETRY_TIMEOUT.get())) {
@@ -142,7 +139,7 @@ public final class PresharedChunkSource {
         }
         request = prepareL3(segment, gridXZ);
         futures.put(gridXZ, request);
-        return new Pending(request.future, managedThread);
+        return new Pending(request.future);
     }
 
     private void liftL2(long gridXZ, @Nullable RequestResponse result) {
@@ -166,6 +163,8 @@ public final class PresharedChunkSource {
         }
     }
 
+    private static final Executor VT_EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
+
     private Request prepareL3(@Nullable MemorySegment loadedSegment, long gridXZ) {
         CompletableFuture<@Nullable MemorySegment> loadFuture;
         if (loadedSegment != null) {
@@ -177,7 +176,7 @@ public final class PresharedChunkSource {
                         Path path = source.tryLoad(gridXZ);
                         if (path != null) {
                             try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ)) {
-                                return channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size(), ARENA);
+                                return channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size(), arena);
                             }
                         }
                     }
@@ -190,7 +189,7 @@ public final class PresharedChunkSource {
                     throw e instanceof RuntimeException re ? re : new RuntimeException(e);
                 }
                 return null;
-            }, Executors.newVirtualThreadPerTaskExecutor());
+            }, VT_EXECUTOR);
         }
 
         CompletableFuture<@Nullable RequestResponse> parseFuture = loadFuture.thenApplyAsync(segment -> {
@@ -206,26 +205,52 @@ public final class PresharedChunkSource {
         }, decompressor);
 
         Request request = new Request(System.currentTimeMillis(), parseFuture);
+        record LiftFuture(
+                long gridXZ, WeakReference<PresharedChunkSource> self, WeakReference<Request> request
+        ) implements Consumer<RequestResponse> { // Use an inline record here to avoid mistakenly capture 'this' and cause memory leak.
+            @Override
+            public void accept(RequestResponse response) {
+                PresharedChunkSource self = this.self.get();
+                Request request = this.request.get();
 
-        WeakReference<Request> reference = new WeakReference<>(request);
-        parseFuture.thenAcceptAsync(response -> {
-            Request current = reference.get();
-            if (current != null && futures.remove(gridXZ, current)) {
-                liftL2(gridXZ, response);
+                if (self != null && request != null) {
+                    self.assertThread();
+                    if (self.arena.scope().isAlive() && self.futures.remove(gridXZ, request)) {
+                        self.liftL2(gridXZ, response);
+                    }
+                }
             }
-        }, managedThreadIdeExecutor);
+        }
+        parseFuture.thenAcceptAsync(new LiftFuture(gridXZ, new WeakReference<>(this), new WeakReference<>(request)), managedThreadIdeExecutor);
 
         return request;
     }
 
     public void close() {
-        ARENA.close();
-        decompressor.shutdown();
+        decompressor.shutdownNow();
         for (IPresharedChunkSource source : sources) {
             try {
                 source.close();
             } catch (IOException _) {
             }
+        }
+
+        Thread.startVirtualThread(() -> {
+            // Closing the arena after no tasks is access MemorySegment (s) on decompressor threadpool.
+            try {
+                while (decompressor.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS)) {
+                    Thread.yield();
+                }
+            } catch (InterruptedException _) {
+            }
+
+            arena.close();
+        });
+    }
+
+    private void assertThread() {
+        if (!FMLEnvironment.isProduction() && Thread.currentThread() != managedThread) {
+            throw new IllegalMonitorStateException(Objects.toIdentityString(this) + " is managed by " + managedThread);
         }
     }
 }

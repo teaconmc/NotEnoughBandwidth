@@ -97,7 +97,7 @@ public class PresharedChunkClient {
             return;
         }
         sourceAttribute.set(new PresharedChunkSource(
-                Minecraft.getInstance(),
+                connection.channel().eventLoop(),
                 registryAccess,
                 PresharedChunksIO.ofExecutorService("Client Chunk Decompressor [Native]"),
                 sources
@@ -161,7 +161,6 @@ public class PresharedChunkClient {
                 case PresharedChunkSource.Loaded(PresharedChunk c) -> chunk = c;
                 case PresharedChunkSource.Pending pending -> {
                     pending.thenRunAsync(
-                            context.channelHandlerContext().executor(),
                             success -> {
                                 context.reply(new PresharedChunkRequestPacket(packet.pos(), !success));
                                 if (success) {
