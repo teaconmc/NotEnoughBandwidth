@@ -91,13 +91,18 @@ public class PresharedChunkServer {
     /// grid_pos
     private static final AttributeKey<long[]> FORCE_VANILLA_CHUNKS = AttributeKey.newInstance(NotEnoughBandwidth.id("force_vanilla_chunks").toString());
 
-    public static void markForceVanillaChunk(Connection connection, ChunkPos pos) {
+    public static void markChunkStrategy(Connection connection, ChunkPos pos, boolean forceVanilla) {
         Attribute<long[]> attr = connection.channel().attr(FORCE_VANILLA_CHUNKS);
         long[] chunks = attr.get();
         if (chunks == null) {
             attr.set(chunks = PresharedRejection.allocate());
         }
-        PresharedRejection.markRejected(chunks, GridPos.fromChunk(pos).pack());
+
+        if (forceVanilla) {
+            PresharedRejection.markRejected(chunks, GridPos.fromChunk(pos).pack());
+        } else {
+            PresharedRejection.clearRejected(chunks, GridPos.fromChunk(pos).pack());
+        }
     }
 
     public static PresharedChunkSource.IResult makePacket(Connection connection, LevelChunk chunk) {
@@ -134,6 +139,18 @@ public class PresharedChunkServer {
             }
 
             values[1] = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(NEBConfigs.PRESHARED_CHUNK_RETRY_TIMEOUT.get() + 2);
+        }
+
+        public static void clearRejected(long[] values, long gridXZ) {
+            for (int i = 0; i < MAX; i++) {
+                if (values[i * 2 + 1] < System.currentTimeMillis()) {
+                    return;
+                }
+                if (values[i * 2] == gridXZ) {
+                    values[i * 2] = GridPos.pack(Integer.MAX_VALUE, Integer.MAX_VALUE);
+                    return;
+                }
+            }
         }
 
         public static boolean isRejected(long[] values, long gridXZ) {

@@ -43,9 +43,7 @@ public record PresharedChunkRequestPacket(ChunkPos pos, boolean forceVanilla) im
             if (player.getChunkTrackingView().contains(pos)) {
                 LevelChunk chunk = player.level().getChunkSource().getChunkNow(pos.x(), pos.z());
                 if (chunk != null) {
-                    if (packet.forceVanilla) {
-                        PresharedChunkServer.markForceVanillaChunk(listener.getConnection(), pos);
-                    }
+                    PresharedChunkServer.markChunkStrategy(listener.getConnection(), pos, packet.forceVanilla);
                     listener.chunkSender.markChunkPendingToSend(chunk);
                 }
             }
