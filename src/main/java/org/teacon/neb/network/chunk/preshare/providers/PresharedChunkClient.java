@@ -6,10 +6,12 @@ import io.netty.util.AttributeKey;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.network.Connection;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.level.ChunkPos;
@@ -152,14 +154,14 @@ public class PresharedChunkClient {
 
             PresharedChunk chunk;
             long pos = packet.pos().pack();
-            switch (source.load(pos, true)) {
+            switch (source.load(pos, true)) { // TODO: Predict player's position and load chunk base from CDN in advance
                 case PresharedChunkSource.Empty _, PresharedChunkSource.Failed _ -> {
                     context.enqueueWork(() -> ChunkReceivingEvent.VANILLA_REQUEST.submit(pos));
                     context.reply(new PresharedChunkRequestPacket(packet.pos(), true));
                     return;
                 }
                 case PresharedChunkSource.Loaded(PresharedChunk c) -> chunk = c;
-                case PresharedChunkSource.Pending pending -> {
+                case PresharedChunkSource.Pending pending -> { // TODO: Request vanilla ClientboundLevelChunkWithLight immediately if the chunk is too close to the player.
                     pending.thenRunAsync(
                             success -> {
                                 context.reply(new PresharedChunkRequestPacket(packet.pos(), !success));

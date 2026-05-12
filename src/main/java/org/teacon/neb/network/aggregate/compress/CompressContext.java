@@ -78,7 +78,6 @@ public final class CompressContext implements AutoCloseable {
         this.compress = compress;
         this.decompress = decompress;
 
-        // TODO: We use Cleaner to close unused context for now. Maybe use a better implementation instead?
         this.cleanable = CLEANER.register(this, new CleanableImpl(compress::close, decompress::close));
     }
 

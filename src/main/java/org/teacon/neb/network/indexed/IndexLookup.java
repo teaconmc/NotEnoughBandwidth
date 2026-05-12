@@ -31,7 +31,7 @@ public final class IndexLookup {
     public static void initialize(Map<Identifier, PayloadRegistration<?>> payloads) {
         List<Identifier> packets = new ArrayList<>();
         for (PayloadRegistration<?> registration : payloads.values()) {
-            if (registration.optional()) { // TODO: How to deal with optional packets?
+            if (registration.optional()) { // FIXME: How to deal with optional packets?
                 continue;
             }
 

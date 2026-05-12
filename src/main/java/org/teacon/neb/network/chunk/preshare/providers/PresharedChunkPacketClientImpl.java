@@ -142,11 +142,16 @@ public class PresharedChunkPacketClientImpl {
         }
     }
 
+    public static void setLocalPlayer(Minecraft minecraft, LocalPlayer player) {
+        PLAYER.setVolatile(minecraft, player);
+    }
+
     @Nullable
     static LocalPlayer getLocalPlayer() {
-        LocalPlayer player = (LocalPlayer) PLAYER.get(Minecraft.getInstance());
+        Minecraft minecraft = Minecraft.getInstance();
+        LocalPlayer player = (LocalPlayer) PLAYER.get(minecraft);
         if (player == null) {
-            player = (LocalPlayer) PLAYER.getAcquire(Minecraft.getInstance());
+            player = (LocalPlayer) PLAYER.getVolatile(minecraft);
         }
         return player;
     }
