@@ -70,7 +70,6 @@ public final class ClientChunkDebugOverlay {
     };
 
     public static void render(@NonNull GuiGraphicsExtractor graphics) {
-        // FIXME: Fucking Mojang use a List to store active debuggers.
         Minecraft minecraft = Minecraft.getInstance();
         if (!minecraft.debugEntries.getCurrentlyEnabled().contains(ID) || minecraft.level == null || minecraft.player == null) {
             ChunkReceivingEvent.clear();
