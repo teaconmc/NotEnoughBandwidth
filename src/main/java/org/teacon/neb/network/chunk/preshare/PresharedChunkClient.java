@@ -16,6 +16,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
@@ -143,6 +144,11 @@ public class PresharedChunkClient {
         });
 
         event.register(PresharedChunkPacket.TYPE, HandlerThread.NETWORK, (packet, context) -> {
+            if (ModList.get().isLoaded("replaymod")) {
+                context.reply(new PresharedChunkRequestPacket(packet.pos(), true));
+                return;
+            }
+
             LocalPlayer player = PresharedChunkPacketClientImpl.getLocalPlayer();
             PresharedChunkSource source = context.connection().channel().attr(SOURCE).get();
             if (source == null || (player != null && player.level().dimension() != Level.OVERWORLD)) {
