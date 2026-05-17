@@ -1,4 +1,4 @@
-package org.teacon.neb.network.chunk.preshare.grid;
+package org.teacon.neb.network.chunk.preshare.repo;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
@@ -16,12 +16,12 @@ import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.teacon.neb.network.aggregate.compress.CompressContext;
-import org.teacon.neb.network.chunk.preshare.PresharedChunk;
+import org.teacon.neb.network.chunk.preshare.data.PresharedChunk;
 import org.teacon.neb.network.chunk.preshare.data.BlockEntityInfo;
 import org.teacon.neb.network.chunk.preshare.data.HeightMap;
 import org.teacon.neb.network.chunk.preshare.data.LevelLightSection;
 import org.teacon.neb.network.chunk.preshare.data.SectionInstance;
-import org.teacon.neb.network.chunk.preshare.grid.repos.PresharedChunkLocalSource;
+import org.teacon.neb.network.chunk.preshare.repo.impl.PresharedChunkLocalSource;
 import org.teacon.neb.utils.ContextByteBuf;
 import org.teacon.neb.utils.GridPos;
 

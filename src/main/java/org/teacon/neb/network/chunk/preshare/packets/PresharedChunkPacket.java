@@ -1,4 +1,4 @@
-package org.teacon.neb.network.chunk.preshare;
+package org.teacon.neb.network.chunk.preshare.packets;
 
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;

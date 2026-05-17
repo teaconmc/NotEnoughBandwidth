@@ -1,4 +1,4 @@
-package org.teacon.neb.network.chunk.preshare.grid.repos;
+package org.teacon.neb.network.chunk.preshare.repo.impl;
 
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;

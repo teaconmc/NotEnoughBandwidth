@@ -17,7 +17,7 @@ import net.neoforged.neoforge.client.event.RegisterDebugEntriesEvent;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.teacon.neb.NotEnoughBandwidth;
-import org.teacon.neb.network.chunk.preshare.providers.PresharedChunkClient;
+import org.teacon.neb.network.chunk.preshare.PresharedChunkClient;
 import org.teacon.neb.utils.vm.LookupAccess;
 
 import java.lang.invoke.VarHandle;

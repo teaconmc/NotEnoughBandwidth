@@ -3,7 +3,7 @@ package org.teacon.neb;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import net.minecraft.server.MinecraftServer;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
-import org.teacon.neb.network.chunk.preshare.grid.PresharedChunksIO;
+import org.teacon.neb.network.chunk.preshare.repo.PresharedChunksIO;
 
 import java.nio.file.Files;
 import java.nio.file.Path;

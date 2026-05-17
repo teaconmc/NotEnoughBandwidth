@@ -1,12 +1,9 @@
-package org.teacon.neb.network.chunk.preshare;
+package org.teacon.neb.network.chunk.preshare.data;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
-import org.teacon.neb.network.chunk.preshare.data.BlockEntityInfo;
-import org.teacon.neb.network.chunk.preshare.data.HeightMap;
-import org.teacon.neb.network.chunk.preshare.data.LevelLightSection;
-import org.teacon.neb.network.chunk.preshare.data.SectionInstance;
+import org.teacon.neb.network.chunk.preshare.packets.PresharedChunkPacket;
 
 import java.util.List;
 

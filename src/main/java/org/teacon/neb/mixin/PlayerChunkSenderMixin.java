@@ -16,9 +16,9 @@ import net.neoforged.neoforge.network.payload.AuxiliaryLightDataPayload;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Unique;
-import org.teacon.neb.network.chunk.preshare.PresharedChunk;
-import org.teacon.neb.network.chunk.preshare.grid.PresharedChunkSource;
-import org.teacon.neb.network.chunk.preshare.providers.PresharedChunkServer;
+import org.teacon.neb.network.chunk.preshare.data.PresharedChunk;
+import org.teacon.neb.network.chunk.preshare.repo.PresharedChunkSource;
+import org.teacon.neb.network.chunk.preshare.PresharedChunkServer;
 import org.teacon.neb.utils.vm.LookupAccess;
 
 import java.lang.invoke.VarHandle;

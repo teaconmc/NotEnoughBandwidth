@@ -1,4 +1,4 @@
-package org.teacon.neb.network.chunk.preshare.providers;
+package org.teacon.neb.network.chunk.preshare;
 
 import com.google.common.collect.ImmutableMap;
 import net.minecraft.client.Minecraft;
@@ -12,8 +12,8 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.levelgen.Heightmap;
 import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NullMarked;
-import org.teacon.neb.network.chunk.preshare.PresharedChunk;
-import org.teacon.neb.network.chunk.preshare.PresharedChunkPacket;
+import org.teacon.neb.network.chunk.preshare.data.PresharedChunk;
+import org.teacon.neb.network.chunk.preshare.packets.PresharedChunkPacket;
 import org.teacon.neb.network.chunk.preshare.data.BlockEntityInfo;
 import org.teacon.neb.network.chunk.preshare.data.LevelLightSection;
 import org.teacon.neb.network.chunk.preshare.data.SectionInstance;

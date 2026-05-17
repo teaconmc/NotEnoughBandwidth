@@ -19,8 +19,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.teacon.neb.network.chunk.debug.ChunkReceivingEvent;
-import org.teacon.neb.network.chunk.preshare.providers.PresharedChunkClient;
-import org.teacon.neb.network.chunk.preshare.providers.PresharedChunkPacketClientImpl;
+import org.teacon.neb.network.chunk.preshare.PresharedChunkClient;
+import org.teacon.neb.network.chunk.preshare.PresharedChunkPacketClientImpl;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;

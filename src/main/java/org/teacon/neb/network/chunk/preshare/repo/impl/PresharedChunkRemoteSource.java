@@ -1,4 +1,4 @@
-package org.teacon.neb.network.chunk.preshare.grid.repos;
+package org.teacon.neb.network.chunk.preshare.repo.impl;
 
 import net.minecraft.world.level.ChunkPos;
 import org.jspecify.annotations.Nullable;

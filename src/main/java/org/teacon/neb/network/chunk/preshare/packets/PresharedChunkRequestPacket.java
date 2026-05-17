@@ -1,4 +1,4 @@
-package org.teacon.neb.network.chunk.preshare;
+package org.teacon.neb.network.chunk.preshare.packets;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -14,7 +14,7 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import org.jetbrains.annotations.NotNull;
 import org.teacon.neb.NotEnoughBandwidth;
-import org.teacon.neb.network.chunk.preshare.providers.PresharedChunkServer;
+import org.teacon.neb.network.chunk.preshare.PresharedChunkServer;
 
 @EventBusSubscriber
 public record PresharedChunkRequestPacket(ChunkPos pos, boolean forceVanilla) implements CustomPacketPayload {

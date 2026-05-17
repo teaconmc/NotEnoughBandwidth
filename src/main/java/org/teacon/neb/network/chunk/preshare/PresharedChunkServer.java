@@ -1,4 +1,4 @@
-package org.teacon.neb.network.chunk.preshare.providers;
+package org.teacon.neb.network.chunk.preshare;
 
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
@@ -19,10 +19,10 @@ import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 import org.teacon.neb.NEBConfigs;
 import org.teacon.neb.NotEnoughBandwidth;
-import org.teacon.neb.network.chunk.preshare.PresharedChunkVersionPacket;
-import org.teacon.neb.network.chunk.preshare.grid.PresharedChunkSource;
-import org.teacon.neb.network.chunk.preshare.grid.PresharedChunksIO;
-import org.teacon.neb.network.chunk.preshare.grid.repos.PresharedChunkLocalSource;
+import org.teacon.neb.network.chunk.preshare.packets.PresharedChunkVersionPacket;
+import org.teacon.neb.network.chunk.preshare.repo.PresharedChunkSource;
+import org.teacon.neb.network.chunk.preshare.repo.PresharedChunksIO;
+import org.teacon.neb.network.chunk.preshare.repo.impl.PresharedChunkLocalSource;
 import org.teacon.neb.utils.GridPos;
 
 import java.io.IOException;

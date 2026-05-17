@@ -1,4 +1,4 @@
-package org.teacon.neb.network.chunk.preshare.grid;
+package org.teacon.neb.network.chunk.preshare.repo;
 
 import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
@@ -13,8 +13,8 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.teacon.neb.NEBConfigs;
-import org.teacon.neb.network.chunk.preshare.PresharedChunk;
-import org.teacon.neb.network.chunk.preshare.grid.repos.IPresharedChunkSource;
+import org.teacon.neb.network.chunk.preshare.data.PresharedChunk;
+import org.teacon.neb.network.chunk.preshare.repo.impl.IPresharedChunkSource;
 import org.teacon.neb.utils.ContextByteBuf;
 import org.teacon.neb.utils.GridPos;
 
