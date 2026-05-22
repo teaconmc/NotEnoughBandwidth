@@ -128,6 +128,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             neo_version            : neo_version,
             mod_id                 : mod_id,
             mod_name               : mod_name,
+            mod_description        : mod_description,
             mod_license            : mod_license,
             mod_version            : mod_version,
     ]
@@ -145,16 +146,39 @@ neoForge.ideSyncTask generateModMetadata
 // Example configuration to allow publishing using the maven-publish plugin
 publishing {
     publications {
-        register('mavenJava', MavenPublication) {
-            from components.java
+        release(MavenPublication) {
+            groupId = "org.teacon"
+            artifactId = "NotEnoughBandwidth-NeoForge-26.1"
+
+            artifact jar
+            pom {
+                name = mod_name
+                description = mod_description
+                url = 'https://github.com/teaconmc/NotEnoughBandwidth'
+                issueManagement {
+                    system = 'GitHub Issues'
+                    url = 'https://github.com/teaconmc/NotEnoughBandwidth'
+                }
+                scm {
+                    url = 'https://github.com/teaconmc/NotEnoughBandwidth'
+                    connection = 'scm:git:git://github.com/teaconmc/NotEnoughBandwidth.git'
+                    developerConnection = 'scm:git:git@github.com:teaconmc/NotEnoughBandwidth.git'
+                }
+            }
         }
     }
     repositories {
         maven {
-            url "file://${project.projectDir}/repo"
+            name = "teacon"
+            url = "s3://maven/"
+            credentials(AwsCredentials) {
+                accessKey = System.env.ARCHIVE_ACCESS_KEY
+                secretKey = System.env.ARCHIVE_SECRET_KEY
+            }
         }
     }
 }
+
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
