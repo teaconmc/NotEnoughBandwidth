@@ -2,6 +2,7 @@ package org.teacon.neb.mixin;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
+import com.llamalad7.mixinextras.sugar.ref.LocalRef;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelPipeline;
@@ -14,7 +15,7 @@ import net.minecraft.network.ProtocolInfo;
 import net.minecraft.network.UnconfiguredPipelineHandler;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketFlow;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -42,11 +43,19 @@ public abstract class ConnectionMixin {
     private Channel channel;
 
     @Inject(method = "sendPacket", at = @At("HEAD"), cancellable = true)
-    private void onSendPacket(Packet<?> packet, @Nullable ChannelFutureListener listener, boolean flush, CallbackInfo ci) {
+    private void onSendPacket(
+            CallbackInfo ci,
+            @Local(type = Packet.class) LocalRef<Packet<?>> packet,
+            @Local(type = ChannelFutureListener.class) @Nullable ChannelFutureListener listener
+    ) {
         Connection self = (Connection) (Object) this;
-        if (packet.isTerminal()) {
+        Packet<?> transformed;
+
+        if (packet.get().isTerminal()) {
             NetworkManager.release(self);
-        } else if (listener == null && NetworkManager.onSendPacket(self, packet)) {
+        } else if ((transformed = NetworkManager.onSendPacket(self, packet.get(), listener != null)) != null) {
+            packet.set(transformed);
+        } else {
             this.sentPackets++;
             ci.cancel();
         }

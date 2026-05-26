@@ -17,6 +17,7 @@ import org.teacon.neb.network.aggregate.CompressedPacket;
 import org.teacon.neb.network.indexed.IndexLookup;
 import org.teacon.neb.network.indexed.IndexPacket;
 
+import javax.annotation.Nullable;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
 
@@ -58,29 +59,38 @@ public final class NetworkManager {
         }
     }
 
-    public static boolean onSendPacket(Connection connection, Packet<?> packet) {
-        AggregateBuffer buffer = AggregateBuffer.get(connection);
-        if (buffer == null || USER_BLACK_LIST.contains(packet.type())) {
-            return false;
-        }
-
-        boolean paused = switch (connection.getSending()) {
+    private static boolean isPaused(Connection connection) {
+        return switch (connection.getSending()) {
             case SERVERBOUND -> CLIENT_PAUSE.getAsBoolean();
             case CLIENTBOUND -> {
                 MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
                 yield server != null && server.isPaused();
             }
         };
-        if (paused) {
-            buffer.flush();
-            return false;
-        }
-
-        transformPacket(connection, packet, buffer);
-        return true;
     }
 
-    private static void transformPacket(Connection connection, Packet<?> packet, AggregateBuffer buffer) {
+    @Nullable
+    public static Packet<?> onSendPacket(Connection connection, Packet<?> packet, boolean sendImmediately) {
+        AggregateBuffer buffer = AggregateBuffer.get(connection);
+        if (buffer == null) {
+            return unwrapImmediately(packet);
+        } else if (sendImmediately || isPaused(connection) || USER_BLACK_LIST.contains(packet.type())) {
+            buffer.flush();
+            return unwrapImmediately(packet);
+        } else {
+            enqueuePacket(connection, packet, buffer);
+            return null;
+        }
+    }
+
+    public static Packet<?> unwrapImmediately(Packet<?> packet) {
+        if (packet instanceof TypedPacket<?>(Packet<?> inner, _)) {
+            return inner;
+        }
+        return packet;
+    }
+
+    private static void enqueuePacket(Connection connection, Packet<?> packet, AggregateBuffer buffer) {
         switch (packet) {
             case CompressedPacket ignored ->
                     throw new AssertionError("CompressedPacket should NOT be pushed into the packet flow.");
@@ -99,7 +109,7 @@ public final class NetworkManager {
             }
             case BundlePacket<?> bundle -> {
                 for (Packet<?> sub : bundle.subPackets()) {
-                    transformPacket(connection, sub, buffer);
+                    enqueuePacket(connection, sub, buffer);
                 }
             }
             default -> buffer.push(packet);
