@@ -112,6 +112,15 @@ public final class NetworkManager {
                     enqueuePacket(connection, sub, buffer);
                 }
             }
+            case TypedPacket<?>(Packet<?> inner, String type) -> {
+                if (inner instanceof BundlePacket<?> bundle) {
+                    for (Packet<?> sub : bundle.subPackets()) {
+                        enqueuePacket(connection, new TypedPacket<>(sub, type), buffer);
+                    }
+                } else {
+                    buffer.push(packet);
+                }
+            }
             default -> buffer.push(packet);
         }
     }
