@@ -74,13 +74,21 @@ public final class NetworkManager {
         AggregateBuffer buffer = AggregateBuffer.get(connection);
         if (buffer == null) {
             return unwrapImmediately(packet);
-        } else if (sendImmediately || isPaused(connection) || USER_BLACK_LIST.contains(packet.type())) {
+        } else if (sendImmediately || isPaused(connection) || USER_BLACK_LIST.contains(unwrapType(packet))) {
             buffer.flush();
             return unwrapImmediately(packet);
         } else {
             enqueuePacket(connection, packet, buffer);
             return null;
         }
+    }
+
+    private static PacketType<?> unwrapType(Packet<?> packet) {
+        return switch (packet) {
+            case TypedPacket<?>(Packet<?> inner, _) -> unwrapType(inner);
+            case VanillaCustomPayload payload -> new PacketType<>(packet.type().flow(), payload.payload().type().id());
+            default -> packet.type();
+        };
     }
 
     public static Packet<?> unwrapImmediately(Packet<?> packet) {
