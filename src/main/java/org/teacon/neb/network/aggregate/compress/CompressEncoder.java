@@ -3,6 +3,7 @@ package org.teacon.neb.network.aggregate.compress;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.MessageToMessageEncoder;
 import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.PacketEncoder;
@@ -17,7 +18,6 @@ import org.teacon.neb.profiler.ProfilerChannel;
 import org.teacon.neb.profiler.Snapshot;
 import org.teacon.neb.utils.vm.LookupAccess;
 
-import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
 import java.util.ArrayList;
@@ -48,7 +48,7 @@ public final class CompressEncoder extends MessageToMessageEncoder<CompressEncod
     }
 
     @Override
-    protected void encode(ChannelHandlerContext context, CompressedTransfer transfer, List<Object> out) throws IOException {
+    protected void encode(ChannelHandlerContext context, CompressedTransfer transfer, List<Object> out) {
         PacketEncoder<?> encoder = (PacketEncoder<?>) context.pipeline().get("encoder");
         if (encoder.getProtocolInfo().id() != ConnectionProtocol.PLAY) {
             throw new AssertionError("CompressEncoder should only be enabled in PLAY connection state.");
@@ -91,7 +91,7 @@ public final class CompressEncoder extends MessageToMessageEncoder<CompressEncod
         out.add(buf);
 
         if (!exceptions.isEmpty()) {
-            IOException exception = new IOException("Cannot encode the following packets.");
+            DecoderException exception = new DecoderException("Cannot encode the following packets.");
             for (Throwable throwable : exceptions) {
                 exception.addSuppressed(throwable);
             }

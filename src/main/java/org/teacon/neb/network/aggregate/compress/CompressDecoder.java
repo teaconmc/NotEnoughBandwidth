@@ -3,6 +3,7 @@ package org.teacon.neb.network.aggregate.compress;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.MessageToMessageDecoder;
 import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.PacketDecoder;
@@ -11,13 +12,11 @@ import net.minecraft.network.SkipPacketException;
 import net.minecraft.network.VarInt;
 import net.minecraft.network.protocol.Packet;
 import org.teacon.neb.NotEnoughBandwidth;
-import org.teacon.neb.network.NetworkManager;
 import org.teacon.neb.network.aggregate.CompressedPacket;
 import org.teacon.neb.profiler.ProfilerChannel;
 import org.teacon.neb.profiler.Snapshot;
 import org.teacon.neb.utils.vm.LookupAccess;
 
-import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
@@ -48,7 +47,7 @@ public final class CompressDecoder extends MessageToMessageDecoder<CompressedPac
     }
 
     @Override
-    protected void decode(ChannelHandlerContext context, CompressedPacket msg, List<Object> out) throws IOException {
+    protected void decode(ChannelHandlerContext context, CompressedPacket msg, List<Object> out) {
         PacketDecoder<?> decoder = (PacketDecoder<?>) context.pipeline().get("decoder");
         ProtocolInfo<?> protocolInfo = (ProtocolInfo<?>) PROTOCOL_INFO.get(decoder);
         if (protocolInfo.id() != ConnectionProtocol.PLAY) {
@@ -95,7 +94,7 @@ public final class CompressDecoder extends MessageToMessageDecoder<CompressedPac
         msg.buf().release();
 
         if (!exceptions.isEmpty()) {
-            IOException exception = new IOException("Cannot decode the following packets.");
+            DecoderException exception = new DecoderException("Cannot decode the following packets.");
             for (Throwable throwable : exceptions) {
                 exception.addSuppressed(throwable);
             }
