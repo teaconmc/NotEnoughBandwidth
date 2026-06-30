@@ -12,6 +12,7 @@
     "CustomPayloadPacketMixin",
     "GameProtocolsMixin",
     "PacketDecoderMixin",
+    "PacketEncoderMixin",
     "PlayerChunkSenderMixin",
     "PlayerListMixin",
     "ProtocolSwapHandlerMixin",

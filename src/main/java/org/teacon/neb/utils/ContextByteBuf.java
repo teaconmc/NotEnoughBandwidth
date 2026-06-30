@@ -17,8 +17,4 @@ public final class ContextByteBuf extends RegistryFriendlyByteBuf {
     public PalettedContainerFactory getPalettedContainerFactory() {
         return palettedContainerFactory;
     }
-
-    public ContextByteBuf recreate(ByteBuf buffer) {
-        return new ContextByteBuf(buffer, registryAccess(), getConnectionType());
-    }
 }

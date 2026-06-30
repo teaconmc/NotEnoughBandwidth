@@ -10,14 +10,17 @@ import net.minecraft.network.ProtocolInfo;
 import net.minecraft.network.VarInt;
 import net.minecraft.network.protocol.Packet;
 import org.teacon.neb.NotEnoughBandwidth;
+import org.teacon.neb.network.NetworkManager;
 import org.teacon.neb.network.aggregate.CompressedPacket;
 import org.teacon.neb.profiler.ProfilerChannel;
 import org.teacon.neb.profiler.Snapshot;
 import org.teacon.neb.utils.vm.LookupAccess;
 
+import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
+import java.util.ArrayList;
 import java.util.List;
 
 @ChannelHandler.Sharable
@@ -44,7 +47,7 @@ public final class CompressDecoder extends MessageToMessageDecoder<CompressedPac
     }
 
     @Override
-    protected void decode(ChannelHandlerContext context, CompressedPacket msg, List<Object> out) {
+    protected void decode(ChannelHandlerContext context, CompressedPacket msg, List<Object> out) throws IOException {
         PacketDecoder<?> decoder = (PacketDecoder<?>) context.pipeline().get("decoder");
         ProtocolInfo<?> protocolInfo = (ProtocolInfo<?>) PROTOCOL_INFO.get(decoder);
         if (protocolInfo.id() != ConnectionProtocol.PLAY) {
@@ -53,31 +56,31 @@ public final class CompressDecoder extends MessageToMessageDecoder<CompressedPac
 
         Snapshot snapshot = ProfilerChannel.prepareSnapshot(false, protocolInfo.flow());
         ByteBuf buf = CompressContext.get(context).decompress(msg.buf());
+        List<Throwable> exceptions = new ArrayList<>();
         while (buf.readableBytes() != 0) {
             int length = VarInt.read(buf);
             ByteBuf packet = buf.slice(buf.readerIndex(), length).readerIndex(0).writerIndex(length);
+            buf.skipBytes(length);
 
             int size = out.size();
             try {
                 DECODE.invokeExact(decoder, context, packet, out);
+                if (packet.readerIndex() != packet.capacity()) {
+                    throw new AssertionError("Vanilla PacketDecoder should consume all bytes, or throw an exception.");
+                }
             } catch (Throwable t2) {
-                throw t2 instanceof RuntimeException re ? re : new RuntimeException(t2);
+                exceptions.add(t2);
+                for (int i = 0; i < out.size() - size; i++) {
+                    out.removeLast();
+                }
+                continue;
             }
 
-            if (packet.readerIndex() != packet.capacity()) {
-                throw new AssertionError("PacketDecoder should consume all bytes, or throw an exception.");
+            if (out.size() - size != 1) {
+                throw new AssertionError("PacketDecoder should only push one packet.");
             }
-            buf.skipBytes(length);
-
-            switch (out.size() - size) {
-                case 0 -> {
-                }
-                case 1 -> {
-                    if (snapshot != null) {
-                        snapshot.put((Packet<?>) out.getLast(), packet.writerIndex());
-                    }
-                }
-                default -> throw new AssertionError("PacketDecoder should only push one packet.");
+            if (snapshot != null) {
+                snapshot.put((Packet<?>) out.getLast(), packet.writerIndex());
             }
         }
 
@@ -87,5 +90,13 @@ public final class CompressDecoder extends MessageToMessageDecoder<CompressedPac
 
         buf.release();
         msg.buf().release();
+
+        if (!exceptions.isEmpty()) {
+            IOException exception = new IOException("Cannot decode the following packets.");
+            for (Throwable throwable : exceptions) {
+                exception.addSuppressed(throwable);
+            }
+            throw exception;
+        }
     }
 }

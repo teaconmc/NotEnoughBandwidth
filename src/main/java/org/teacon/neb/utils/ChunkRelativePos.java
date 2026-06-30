@@ -4,12 +4,13 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
+import org.apache.commons.lang3.Validate;
 import org.jetbrains.annotations.Range;
 
 public record ChunkRelativePos(
-        @Range(from = 0, to = 16) short x,
-        @Range(from = -64, to = 384) short y,
-        @Range(from = 0, to = 16) short z,
+        @Range(from = 0, to = 15) short x,
+        @Range(from = -64, to = 383) short y,
+        @Range(from = 0, to = 15) short z,
 
         @Range(from = 0, to = 127) byte flag
 ) {
@@ -27,6 +28,13 @@ public record ChunkRelativePos(
 
     public ChunkRelativePos(BlockPos blockPos, byte flag) {
         this((short) SectionPos.sectionRelative(blockPos.getX()), (short) blockPos.getY(), (short) SectionPos.sectionRelative(blockPos.getZ()), flag);
+    }
+
+    public ChunkRelativePos {
+        Validate.inclusiveBetween(0, 15, x);
+        Validate.inclusiveBetween(-64, 383, y);
+        Validate.inclusiveBetween(0, 15, z);
+        Validate.inclusiveBetween(0, 127, flag);
     }
 
     public static ChunkRelativePos unpack(int value) {

@@ -16,8 +16,10 @@ import org.teacon.neb.profiler.ProfilerChannel;
 import org.teacon.neb.profiler.Snapshot;
 import org.teacon.neb.utils.vm.LookupAccess;
 
+import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
+import java.util.ArrayList;
 import java.util.List;
 
 @ChannelHandler.Sharable
@@ -45,7 +47,7 @@ public final class CompressEncoder extends MessageToMessageEncoder<CompressEncod
     }
 
     @Override
-    protected void encode(ChannelHandlerContext context, CompressedTransfer transfer, List<Object> out) {
+    protected void encode(ChannelHandlerContext context, CompressedTransfer transfer, List<Object> out) throws IOException {
         PacketEncoder<?> encoder = (PacketEncoder<?>) context.pipeline().get("encoder");
         if (encoder.getProtocolInfo().id() != ConnectionProtocol.PLAY) {
             throw new AssertionError("CompressEncoder should only be enabled in PLAY connection state.");
@@ -54,12 +56,14 @@ public final class CompressEncoder extends MessageToMessageEncoder<CompressEncod
         Snapshot snapshot = ProfilerChannel.prepareSnapshot(true, encoder.getProtocolInfo().flow());
         ByteBuf buf = context.alloc().directBuffer(), temp = context.alloc().directBuffer();
 
+        List<Throwable> exceptions = new ArrayList<>();
         for (Packet<?> packet : transfer.packets()) {
             ByteBuf t = temp.duplicate();
             try {
-                ENCODE.invokeExact(encoder, context, NetworkManager.unwrapImmediately(packet), t);
+                ENCODE.invokeExact(encoder, context, NetworkManager.unwrapPacket(packet), t);
             } catch (Throwable t2) {
-                throw t2 instanceof RuntimeException re ? re : new RuntimeException(t2);
+                exceptions.add(t2);
+                continue;
             }
 
             int size = t.writerIndex();
@@ -82,5 +86,13 @@ public final class CompressEncoder extends MessageToMessageEncoder<CompressEncod
 
         temp.release();
         out.add(buf);
+
+        if (!exceptions.isEmpty()) {
+            IOException exception = new IOException("Cannot encode the following packets.");
+            for (Throwable throwable : exceptions) {
+                exception.addSuppressed(throwable);
+            }
+            throw exception;
+        }
     }
 }

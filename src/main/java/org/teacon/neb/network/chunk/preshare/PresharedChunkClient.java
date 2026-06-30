@@ -23,7 +23,6 @@ import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlers
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.HandlerThread;
 import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NullMarked;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.teacon.neb.NEBConfigs;
@@ -55,7 +54,6 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 @EventBusSubscriber(Dist.CLIENT)
-@NullMarked
 public class PresharedChunkClient {
     private static final Logger LOGGER = LoggerFactory.getLogger(PresharedChunkClient.class);
 
