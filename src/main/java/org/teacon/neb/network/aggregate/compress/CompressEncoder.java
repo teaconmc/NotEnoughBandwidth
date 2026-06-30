@@ -6,6 +6,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageEncoder;
 import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.PacketEncoder;
+import net.minecraft.network.SkipPacketException;
 import net.minecraft.network.VarInt;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketType;
@@ -62,7 +63,9 @@ public final class CompressEncoder extends MessageToMessageEncoder<CompressEncod
             try {
                 ENCODE.invokeExact(encoder, context, NetworkManager.unwrapPacket(packet), t);
             } catch (Throwable t2) {
-                exceptions.add(t2);
+                if (!(t2 instanceof SkipPacketException)) {
+                    exceptions.add(t2);
+                }
                 continue;
             }
 

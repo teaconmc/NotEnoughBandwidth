@@ -7,6 +7,7 @@ import io.netty.handler.codec.MessageToMessageDecoder;
 import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.PacketDecoder;
 import net.minecraft.network.ProtocolInfo;
+import net.minecraft.network.SkipPacketException;
 import net.minecraft.network.VarInt;
 import net.minecraft.network.protocol.Packet;
 import org.teacon.neb.NotEnoughBandwidth;
@@ -69,7 +70,9 @@ public final class CompressDecoder extends MessageToMessageDecoder<CompressedPac
                     throw new AssertionError("Vanilla PacketDecoder should consume all bytes, or throw an exception.");
                 }
             } catch (Throwable t2) {
-                exceptions.add(t2);
+                if (!(t2 instanceof SkipPacketException)) {
+                    exceptions.add(t2);
+                }
                 for (int i = 0; i < out.size() - size; i++) {
                     out.removeLast();
                 }
