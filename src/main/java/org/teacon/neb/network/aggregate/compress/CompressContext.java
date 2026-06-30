@@ -159,7 +159,7 @@ public final class CompressContext implements AutoCloseable {
         return original;
     }
 
-    private synchronized int compress0(ByteBuf from, ByteBuf to) {
+    private int compress0(ByteBuf from, ByteBuf to) {
         ByteBuffer target = to.nioBuffer(to.writerIndex(), to.writableBytes());
         if (!compress.compressDirectByteBufferStream(target, from.nioBuffer(), EndDirective.FLUSH)) {
             throw new AssertionError();
@@ -167,7 +167,7 @@ public final class CompressContext implements AutoCloseable {
         return target.position();
     }
 
-    private synchronized int decompress0(ByteBuf from, ByteBuf to) {
+    private int decompress0(ByteBuf from, ByteBuf to) {
         ByteBuffer target = to.nioBuffer(to.writerIndex(), to.writableBytes());
         if (!decompress.decompressDirectByteBufferStream(target, from.nioBuffer()) && target.position() != target.limit()) {
             throw new AssertionError();
