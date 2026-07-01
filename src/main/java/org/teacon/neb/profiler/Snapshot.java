@@ -83,7 +83,7 @@ public final class Snapshot implements Iterable<Snapshot.Entry> {
                         yield payloadID + "[type=" + location + "]";
                     }
                 }
-                yield payloadID + "[type=misc]";
+                yield payloadID;
             }
             case TypedPacket(Packet<?> _, String packetType) -> packetType;
             case IndexPacket(PacketType<IndexPacket> _, CustomPacketPayload payload) -> payload.type().id().toString();
