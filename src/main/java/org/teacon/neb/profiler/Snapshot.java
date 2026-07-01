@@ -10,6 +10,8 @@ import net.minecraft.network.protocol.PacketType;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.resources.Identifier;
+import net.neoforged.neoforge.network.payload.SyncAttachmentsPayload;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.teacon.neb.network.TypedPacket;
@@ -64,25 +66,36 @@ public final class Snapshot implements Iterable<Snapshot.Entry> {
             throw new IllegalStateException("Not BUILDING: " + this.state);
         }
 
-        final Identifier packetID = packet.type().id();
+        String type = crackType(packet);
+        packets.put(type, packSizeRatio(unpackSize(packets.getOrDefault(type, 0)) + size, Float.NaN));
+    }
 
-        String type = switch (packet) {
-            case VanillaCustomPayload payload -> payload.payload().type().id().toString();
+    @SuppressWarnings("UnstableApiUsage")
+    private String crackType(Packet<?> packet) {
+        final String packetID = packet.type().id().toString();
+
+        return switch (packet) {
+            case VanillaCustomPayload payload -> {
+                String payloadID = payload.payload().type().id().toString();
+                if (payload.payload() instanceof SyncAttachmentsPayload attachments && attachments.types().size() == 1) {
+                    Identifier location = NeoForgeRegistries.ATTACHMENT_TYPES.getKey(attachments.types().getFirst());
+                    if (location != null) {
+                        yield payloadID + "[type=" + location + "]";
+                    }
+                }
+                yield payloadID + "[type=misc]";
+            }
             case TypedPacket(Packet<?> _, String packetType) -> packetType;
             case IndexPacket(PacketType<IndexPacket> _, CustomPacketPayload payload) -> payload.type().id().toString();
             case ClientboundBlockEntityDataPacket entityData -> {
                 Identifier location = BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(entityData.getType());
                 if (location != null) {
                     yield packetID + "[type=" + location + "]";
-                } else {
-                    yield packetID.toString();
                 }
+                yield packetID;
             }
-
-            default -> packetID.toString();
+            default -> packetID;
         };
-
-        packets.put(type, packSizeRatio(unpackSize(packets.getOrDefault(type, 0)) + size, Float.NaN));
     }
 
     public void publish(int totalSize, int compressedSize) {
