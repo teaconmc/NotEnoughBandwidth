@@ -11,6 +11,9 @@ import net.minecraft.network.SkipPacketException;
 import net.minecraft.network.VarInt;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketType;
+import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.teacon.neb.NotEnoughBandwidth;
 import org.teacon.neb.network.NetworkManager;
 import org.teacon.neb.network.aggregate.CompressedPacket;
@@ -25,6 +28,8 @@ import java.util.List;
 
 @ChannelHandler.Sharable
 public final class CompressEncoder extends MessageToMessageEncoder<CompressEncoder.CompressedTransfer> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(CompressEncoder.class);
+
     public static final String ID = NotEnoughBandwidth.id("compressed_encoder").toString();
 
     public static final CompressEncoder INSTANCE = new CompressEncoder();
@@ -54,6 +59,24 @@ public final class CompressEncoder extends MessageToMessageEncoder<CompressEncod
             throw new AssertionError("CompressEncoder should only be enabled in PLAY connection state.");
         }
 
+        List<Throwable> exceptions;
+        try {
+            exceptions = encode(context, transfer, out, encoder);
+        } catch (Throwable t) {
+            LOGGER.error("FATAL: SHOULD NOT BE HERE.", t);
+            throw new AssertionError("FATAL: SHOULD NOT BE HERE.", t);
+        }
+        if (!exceptions.isEmpty()) {
+            DecoderException exception = new DecoderException("Cannot encode the following packets.");
+            for (Throwable throwable : exceptions) {
+                exception.addSuppressed(throwable);
+            }
+            throw exception;
+        }
+    }
+
+    @NonNull
+    private List<Throwable> encode(ChannelHandlerContext context, CompressedTransfer transfer, List<Object> out, PacketEncoder<?> encoder) {
         Snapshot snapshot = ProfilerChannel.prepareSnapshot(true, encoder.getProtocolInfo().flow());
         ByteBuf buf = context.alloc().directBuffer(), temp = context.alloc().directBuffer();
 
@@ -89,13 +112,6 @@ public final class CompressEncoder extends MessageToMessageEncoder<CompressEncod
 
         temp.release();
         out.add(buf);
-
-        if (!exceptions.isEmpty()) {
-            DecoderException exception = new DecoderException("Cannot encode the following packets.");
-            for (Throwable throwable : exceptions) {
-                exception.addSuppressed(throwable);
-            }
-            throw exception;
-        }
+        return exceptions;
     }
 }

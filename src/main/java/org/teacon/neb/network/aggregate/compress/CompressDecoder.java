@@ -11,6 +11,9 @@ import net.minecraft.network.ProtocolInfo;
 import net.minecraft.network.SkipPacketException;
 import net.minecraft.network.VarInt;
 import net.minecraft.network.protocol.Packet;
+import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.teacon.neb.NotEnoughBandwidth;
 import org.teacon.neb.network.aggregate.CompressedPacket;
 import org.teacon.neb.profiler.ProfilerChannel;
@@ -25,6 +28,8 @@ import java.util.List;
 
 @ChannelHandler.Sharable
 public final class CompressDecoder extends MessageToMessageDecoder<CompressedPacket> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(CompressDecoder.class);
+
     public static final String ID = NotEnoughBandwidth.id("compressed_decoder").toString();
 
     public static final CompressDecoder INSTANCE = new CompressDecoder();
@@ -54,6 +59,25 @@ public final class CompressDecoder extends MessageToMessageDecoder<CompressedPac
             throw new AssertionError("CompressDecoder should only be enabled in PLAY connection state.");
         }
 
+        List<Throwable> exceptions;
+        try {
+            exceptions = decode(context, msg, out, protocolInfo, decoder);
+        } catch (Throwable t) {
+            LOGGER.error("FATAL: SHOULD NOT BE HERE.", t);
+            throw new AssertionError("FATAL: SHOULD NOT BE HERE.", t);
+        }
+
+        if (!exceptions.isEmpty()) {
+            DecoderException exception = new DecoderException("Cannot decode the following packets.");
+            for (Throwable throwable : exceptions) {
+                exception.addSuppressed(throwable);
+            }
+            throw exception;
+        }
+    }
+
+    @NonNull
+    private List<Throwable> decode(ChannelHandlerContext context, CompressedPacket msg, List<Object> out, ProtocolInfo<?> protocolInfo, PacketDecoder<?> decoder) {
         Snapshot snapshot = ProfilerChannel.prepareSnapshot(false, protocolInfo.flow());
         ByteBuf buf = CompressContext.get(context).decompress(msg.buf());
         List<Throwable> exceptions = new ArrayList<>();
@@ -92,13 +116,6 @@ public final class CompressDecoder extends MessageToMessageDecoder<CompressedPac
 
         buf.release();
         msg.buf().release();
-
-        if (!exceptions.isEmpty()) {
-            DecoderException exception = new DecoderException("Cannot decode the following packets.");
-            for (Throwable throwable : exceptions) {
-                exception.addSuppressed(throwable);
-            }
-            throw exception;
-        }
+        return exceptions;
     }
 }
