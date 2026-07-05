@@ -1,15 +1,14 @@
 package org.teacon.neb.profiler;
 
-import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public final class SnapshotContext {
     private final Consumer<Snapshot> consumer;
 
-    private final Object2ObjectMap<String, float[]> compressibility = new Object2ObjectOpenHashMap<>();
+    private final Map<String, float[]> compressibility = new ConcurrentHashMap<>();
 
     public SnapshotContext(Consumer<Snapshot> consumer) {
         this.consumer = consumer;
@@ -19,8 +18,16 @@ public final class SnapshotContext {
         float compressibility = Math.clamp(compressedSize / (float) totalSize, 0, 1);
         float weight = size / (float) totalSize;
 
-        float[] samples = this.compressibility.computeIfAbsent(type, _ -> PacketCompressibility.makeEmpty());
-        return PacketCompressibility.putSample(samples, compressibility, weight);
+        float[] ratio = new float[1];
+        this.compressibility.compute(type, (_, samples) -> {
+            if (samples == null) {
+                samples = PacketCompressibility.makeEmpty();
+            }
+            ratio[0] = PacketCompressibility.putSample(samples, compressibility, weight);
+            return samples;
+        });
+
+        return ratio[0];
     }
 
     public void publish(Snapshot snapshot) {
