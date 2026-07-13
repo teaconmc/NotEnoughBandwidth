@@ -85,7 +85,7 @@ public final class Snapshot implements Iterable<Snapshot.Entry> {
                 }
                 yield payloadID;
             }
-            case TypedPacket(Packet<?> _, String packetType) -> packetType;
+            case TypedPacket(Packet<?> inner, String extra) -> crackType(inner) + "[" + extra + "]";
             case IndexPacket(PacketType<IndexPacket> _, CustomPacketPayload payload) -> payload.type().id().toString();
             case ClientboundBlockEntityDataPacket entityData -> {
                 Identifier location = BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(entityData.getType());

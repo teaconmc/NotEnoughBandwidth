@@ -5,12 +5,15 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.MessageToMessageDecoder;
+import net.minecraft.CrashReport;
 import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.PacketDecoder;
 import net.minecraft.network.ProtocolInfo;
 import net.minecraft.network.SkipPacketException;
 import net.minecraft.network.VarInt;
 import net.minecraft.network.protocol.Packet;
+import net.minecraft.server.MinecraftServer;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,6 +67,10 @@ public final class CompressDecoder extends MessageToMessageDecoder<CompressedPac
             exceptions = decode(context, msg, out, protocolInfo, decoder);
         } catch (Throwable t) {
             LOGGER.error("FATAL: SHOULD NOT BE HERE.", t);
+            MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+            if (server != null) {
+                server.delayCrash(new CrashReport("FATAL: SHOULD NOT BE HERE", t));
+            }
             throw new AssertionError("FATAL: SHOULD NOT BE HERE.", t);
         }
 

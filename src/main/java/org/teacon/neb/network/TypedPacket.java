@@ -5,7 +5,7 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketType;
 import org.jspecify.annotations.NonNull;
 
-public record TypedPacket<T extends PacketListener>(Packet<T> packet, String packetType) implements Packet<T> {
+public record TypedPacket<T extends PacketListener>(Packet<T> packet, String extra) implements Packet<T> {
     @Override
     public @NonNull PacketType<? extends Packet<T>> type() {
         return packet.type();
