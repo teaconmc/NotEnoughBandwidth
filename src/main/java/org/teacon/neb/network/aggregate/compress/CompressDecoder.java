@@ -54,6 +54,20 @@ public final class CompressDecoder extends MessageToMessageDecoder<CompressedPac
     private CompressDecoder() {
     }
 
+    private static final ScopedValue<Boolean> IS_DELEGATE = ScopedValue.newInstance();
+
+    public static void onDecodeSingle(PacketDecoder<?> decoder, Packet<?> packet, int size) {
+        if (IS_DELEGATE.isBound() || packet instanceof CompressedPacket) {
+            return;
+        }
+
+        Snapshot snapshot = ProfilerChannel.prepareSnapshot(false, ((ProtocolInfo<?>) PROTOCOL_INFO.get(decoder)).flow());
+        if (snapshot != null) {
+            snapshot.put(packet, size);
+            snapshot.publish(size, size);
+        }
+    }
+
     @Override
     protected void decode(ChannelHandlerContext context, CompressedPacket msg, List<Object> out) {
         PacketDecoder<?> decoder = (PacketDecoder<?>) context.pipeline().get("decoder");
@@ -64,7 +78,7 @@ public final class CompressDecoder extends MessageToMessageDecoder<CompressedPac
 
         List<Throwable> exceptions;
         try {
-            exceptions = decode(context, msg, out, protocolInfo, decoder);
+            exceptions = ScopedValue.where(IS_DELEGATE, true).call(() -> decode(context, msg, out, protocolInfo, decoder));
         } catch (Throwable t) {
             LOGGER.error("FATAL: SHOULD NOT BE HERE.", t);
             MinecraftServer server = ServerLifecycleHooks.getCurrentServer();

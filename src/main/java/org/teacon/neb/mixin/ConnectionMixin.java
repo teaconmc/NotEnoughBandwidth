@@ -53,7 +53,7 @@ public abstract class ConnectionMixin {
 
         if (packet.get().isTerminal()) {
             NetworkManager.release(self);
-        } else if ((transformed = NetworkManager.onSendPacket(self, packet.get(), listener != null)) != null) {
+        } else if ((transformed = NetworkManager.onSendPacket(self, packet.get(), listener)) != null) {
             packet.set(transformed);
         } else {
             this.sentPackets++;

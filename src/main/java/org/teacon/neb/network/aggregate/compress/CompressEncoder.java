@@ -55,8 +55,26 @@ public final class CompressEncoder extends MessageToMessageEncoder<CompressEncod
     public record CompressedTransfer(PacketType<CompressedPacket> type, List<Packet<?>> packets) {
     }
 
+    private static final ScopedValue<Boolean> IS_DELEGATE = ScopedValue.newInstance();
+
+    public static void onEncodeSingle(PacketEncoder<?> encoder, Packet<?> packet, int size) {
+        if (IS_DELEGATE.isBound()) {
+            return;
+        }
+
+        Snapshot snapshot = ProfilerChannel.prepareSnapshot(true, encoder.getProtocolInfo().flow());
+        if (snapshot != null) {
+            snapshot.put(packet, size);
+            snapshot.publish(size, size);
+        }
+    }
+
     @Override
     protected void encode(ChannelHandlerContext context, CompressedTransfer transfer, List<Object> out) {
+        if (transfer.packets().isEmpty()) {
+            return;
+        }
+
         PacketEncoder<?> encoder = (PacketEncoder<?>) context.pipeline().get("encoder");
         if (encoder.getProtocolInfo().id() != ConnectionProtocol.PLAY) {
             throw new AssertionError("CompressEncoder should only be enabled in PLAY connection state.");
@@ -64,7 +82,7 @@ public final class CompressEncoder extends MessageToMessageEncoder<CompressEncod
 
         List<Throwable> exceptions;
         try {
-            exceptions = encode(context, transfer, out, encoder);
+            exceptions = ScopedValue.where(IS_DELEGATE, true).call(() -> encode(context, transfer, out, encoder));
         } catch (Throwable t) {
             LOGGER.error("FATAL: SHOULD NOT BE HERE.", t);
             MinecraftServer server = ServerLifecycleHooks.getCurrentServer();

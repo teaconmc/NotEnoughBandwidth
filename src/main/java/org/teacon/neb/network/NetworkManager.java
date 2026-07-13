@@ -1,6 +1,7 @@
 package org.teacon.neb.network;
 
 import com.google.common.collect.ImmutableSet;
+import io.netty.channel.ChannelFutureListener;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.BundlePacket;
@@ -70,15 +71,18 @@ public final class NetworkManager {
     }
 
     @Nullable
-    public static Packet<?> onSendPacket(Connection connection, Packet<?> packet, boolean sendImmediately) {
+    public static Packet<?> onSendPacket(Connection connection, Packet<?> packet, ChannelFutureListener sendListener) {
         AggregateBuffer buffer = AggregateBuffer.get(connection);
         if (buffer == null) {
             return unwrapPacket(packet);
-        } else if (sendImmediately || isPaused(connection) || USER_BLACK_LIST.contains(unwrapType(packet))) {
+        } else if (isPaused(connection) || USER_BLACK_LIST.contains(unwrapType(packet))) {
             buffer.flush();
             return unwrapPacket(packet);
         } else {
             enqueuePacket(connection, packet, buffer);
+            if (sendListener != null) {
+                buffer.push(sendListener);
+            }
             return null;
         }
     }

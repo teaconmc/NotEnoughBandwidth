@@ -1,10 +1,14 @@
 package org.teacon.neb.network.aggregate;
 
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.Packet;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.teacon.neb.NotEnoughBandwidth;
 import org.teacon.neb.network.aggregate.compress.CompressEncoder;
 
@@ -16,7 +20,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 public final class AggregateBuffer {
     private final Queue<Packet<?>> buffer = new ConcurrentLinkedQueue<>();
-
+    private final Queue<ChannelFutureListener> listeners = new ConcurrentLinkedQueue<>();
     private final Connection connection;
 
     public AggregateBuffer(Connection connection) {
@@ -52,11 +56,25 @@ public final class AggregateBuffer {
         this.buffer.add(packet);
     }
 
+    public void push(ChannelFutureListener listener) {
+        this.listeners.add(listener);
+    }
+
     public void flush() {
-        if (buffer.isEmpty()) {
-            return;
+        ChannelFuture future = flushPackets();
+
+        ChannelFutureListener listener;
+        while ((listener = listeners.poll()) != null) {
+            future.addListener(listener);
+        }
+    }
+
+    private ChannelFuture flushPackets() {
+        if (buffer.isEmpty()) { // Should NOT be here regularly, but we can handle it anyway.
+            return flushPackets(List.of());
         }
 
+        ChannelFuture last = null;
         while (true) {
             List<Packet<?>> packets = new ArrayList<>(200);
 
@@ -66,15 +84,19 @@ public final class AggregateBuffer {
             }
 
             if (!packets.isEmpty()) {
-                this.connection.channel().writeAndFlush(new CompressEncoder.CompressedTransfer(switch (this.connection.getSending()) {
-                    case CLIENTBOUND -> CompressedPacket.C_TYPE;
-                    case SERVERBOUND -> CompressedPacket.S_TYPE;
-                }, packets));
+                last = flushPackets(packets);
             }
 
             if (packet == null) {
-                break;
+                return last != null ? last : flushPackets(List.of());
             }
         }
+    }
+
+    private ChannelFuture flushPackets(List<Packet<?>> packets) {
+        return this.connection.channel().writeAndFlush(new CompressEncoder.CompressedTransfer(switch (this.connection.getSending()) {
+            case CLIENTBOUND -> CompressedPacket.C_TYPE;
+            case SERVERBOUND -> CompressedPacket.S_TYPE;
+        }, packets));
     }
 }
