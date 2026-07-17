@@ -16,6 +16,8 @@
     "PlayerChunkSenderMixin",
     "PlayerListMixin",
     "ProtocolSwapHandlerMixin",
+    "Varint21FrameDecoderMixin",
+    "Varint21LengthFieldPrependerMixin",
     "nf.NetworkRegistryMixin"
   ],
   "client": [

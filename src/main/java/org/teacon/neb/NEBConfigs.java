@@ -1,6 +1,7 @@
 package org.teacon.neb;
 
 import com.google.common.collect.ImmutableSet;
+import net.minecraft.network.VarInt;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.PacketType;
 import net.minecraft.resources.Identifier;
@@ -38,6 +39,8 @@ public final class NEBConfigs {
     public static ModConfigSpec.ConfigValue<Integer> PRESHARED_CHUNK_CACHE_L1_MAX;
     public static ModConfigSpec.ConfigValue<Integer> PRESHARED_CHUNK_RETRY_TIMEOUT;
 
+    public static ModConfigSpec.ConfigValue<Integer> PACKET_MAX_VARINT_SIZE_C2S;
+    public static ModConfigSpec.ConfigValue<Integer> PACKET_MAX_VARINT_SIZE_S2C;
     private static ModConfigSpec.ConfigValue<List<? extends String>> PACKET_BLACKLIST;
 
     private static List<IConfigSpec> CONFIG_SPECS;
@@ -46,6 +49,7 @@ public final class NEBConfigs {
     private static void on(FMLConstructModEvent event) {
         ModConfigSpec.Builder server = new ModConfigSpec.Builder();
         ModConfigSpec.Builder common = new ModConfigSpec.Builder();
+
         COMPRESS_WINDOW_SIZE_LOG = server
                 .comment(formatComments("""
                         The base-2 logarithm of the compression window size. See: https://www.jefftk.com/p/zstd-window-size
@@ -101,10 +105,27 @@ public final class NEBConfigs {
                 .define("retry_timeout", 10);
         server.pop();
 
-        PACKET_BLACKLIST = server.defineList(
-                "packet_blacklist", ArrayList::new, () -> "",
-                element -> element instanceof String value && parsePacketDescriptor(value) != null
-        );
+        server.push("packet");
+        server.comment(formatComments("""
+                        The maximum number of bytes allowed for the VarInt-encoded packet length field.
+                        Larger values permit larger packets, but may increase memory usage and expose the
+                        server to out-of-memory (OOM) attacks if untrusted clients send oversized frames.
+                        """))
+                .push("size_varint_max");
+        PACKET_MAX_VARINT_SIZE_C2S = server.defineInRange("c2s", 3, 1, VarInt.MAX_VARINT_SIZE);
+        PACKET_MAX_VARINT_SIZE_S2C = server.defineInRange("s2c", 3, 1, VarInt.MAX_VARINT_SIZE);
+        server.pop();
+        PACKET_BLACKLIST = server
+                .comment(formatComments("""
+                        Packets excluded from processing by NotEnoughBandwidth. (For Velocity compatibility, e.g.)
+                        Each entry must be in the format "<direction>@<packet_id>", where <direction>
+                        is "c2s" or "s2c", and <packet_id> is a Minecraft packet identifier (like minecraft:register).
+                        """))
+                .defineList(
+                        "blacklist", ArrayList::new, () -> "",
+                        element -> element instanceof String value && parsePacketDescriptor(value) != null
+                );
+        server.pop();
 
         ModConfigSpec serverSpec = server.build(), commonSpec = common.build();
         NotEnoughBandwidth.MOD_CONTAINER.registerConfig(ModConfig.Type.SERVER, serverSpec);

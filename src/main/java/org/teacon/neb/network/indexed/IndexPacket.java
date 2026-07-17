@@ -44,7 +44,11 @@ public record IndexPacket(PacketType<IndexPacket> type,
 
                 StreamCodec<? super FriendlyByteBuf, CustomPacketPayload> codec = getCodec(type);
                 if (codec != null) {
-                    codec.encode(buf, packet.payload());
+                    try {
+                        codec.encode(buf, packet.payload());
+                    } catch (RuntimeException e) {
+                        throw new RuntimeException("Failed to encode custom payload: " + type, e);
+                    }
                 } else {
                     // Should NOT be here: Packets with known index should be known by vanilla CustomPayloadPacket.
                     throw new AssertionError("Identifier " + type + " is unknown.");
@@ -60,8 +64,12 @@ public record IndexPacket(PacketType<IndexPacket> type,
                     CustomPacketPayload payload;
                     try {
                         payload = codec.decode(buf);
+                        int extra = buf.readableBytes();
+                        if (extra != 0) {
+                            throw new RuntimeException("Failed to decode custom payload, found " + extra + " bytes extra after reading " + type);
+                        }
                     } catch (RuntimeException e) {
-                        throw new RuntimeException("Failed to encode custom payload: " + type, e);
+                        throw new RuntimeException("Failed to decode custom payload: " + type, e);
                     }
 
                     return new IndexPacket(packetType, payload);

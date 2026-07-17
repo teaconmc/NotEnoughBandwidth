@@ -2,6 +2,7 @@ package org.teacon.neb.network;
 
 import com.google.common.collect.ImmutableSet;
 import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.BundlePacket;
@@ -12,7 +13,9 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.neoforge.network.connection.ConnectionUtils;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
+import org.teacon.neb.NEBConfigs;
 import org.teacon.neb.network.aggregate.AggregateBuffer;
 import org.teacon.neb.network.aggregate.CompressedPacket;
 import org.teacon.neb.network.indexed.IndexLookup;
@@ -42,6 +45,17 @@ public final class NetworkManager {
 
     public static void release(Connection connection) {
         AggregateBuffer.release(connection);
+    }
+
+    public static int getMaxFrameVarintSize(ChannelHandlerContext ctx) {
+        try {
+            return switch (ConnectionUtils.getConnection(ctx).getSending()) {
+                case CLIENTBOUND -> NEBConfigs.PACKET_MAX_VARINT_SIZE_S2C.get();
+                case SERVERBOUND -> NEBConfigs.PACKET_MAX_VARINT_SIZE_C2S.get();
+            };
+        } catch (IllegalStateException _) {
+            return 3;
+        }
     }
 
     private static final BooleanSupplier CLIENT_PAUSE;
