@@ -6,6 +6,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.teacon.neb.NEBConfigs;
+import org.teacon.neb.utils.ConfigAccess;
 
 @Mixin(PlayerList.class)
 public class PlayerListMixin {
@@ -16,10 +17,6 @@ public class PlayerListMixin {
             shift = At.Shift.AFTER
     ), argsOnly = true)
     private int modifyViewDistance(int viewDistance) {
-        try {
-            return viewDistance + NEBConfigs.CHUNK_CACHE_DISTANCE.get();
-        } catch (IllegalStateException _) {
-            return viewDistance;
-        }
+        return viewDistance + ConfigAccess.getOrDefault(NEBConfigs.CHUNK_CACHE_DISTANCE, 0);
     }
 }

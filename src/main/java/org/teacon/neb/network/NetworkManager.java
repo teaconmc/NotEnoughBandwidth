@@ -13,6 +13,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.neoforge.common.ModConfigSpec;
 import net.neoforged.neoforge.network.connection.ConnectionUtils;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import org.teacon.neb.NEBConfigs;
@@ -20,6 +21,7 @@ import org.teacon.neb.network.aggregate.AggregateBuffer;
 import org.teacon.neb.network.aggregate.CompressedPacket;
 import org.teacon.neb.network.indexed.IndexLookup;
 import org.teacon.neb.network.indexed.IndexPacket;
+import org.teacon.neb.utils.ConfigAccess;
 
 import javax.annotation.Nullable;
 import java.util.Set;
@@ -47,15 +49,17 @@ public final class NetworkManager {
         AggregateBuffer.release(connection);
     }
 
+    @SuppressWarnings("ConstantValue")
     public static int getMaxFrameVarintSize(ChannelHandlerContext ctx) {
-        try {
-            return switch (ConnectionUtils.getConnection(ctx).getSending()) {
-                case CLIENTBOUND -> NEBConfigs.PACKET_MAX_VARINT_SIZE_S2C.get();
-                case SERVERBOUND -> NEBConfigs.PACKET_MAX_VARINT_SIZE_C2S.get();
-            };
-        } catch (IllegalStateException _) {
+        Connection conn = ConnectionUtils.getConnection(ctx); // null if the connection is non-minecraft ones.
+        if (conn == null) {
             return 3;
         }
+        ModConfigSpec.ConfigValue<Integer> v =  switch (conn.getSending()) {
+            case CLIENTBOUND -> NEBConfigs.PACKET_MAX_VARINT_SIZE_S2C;
+            case SERVERBOUND -> NEBConfigs.PACKET_MAX_VARINT_SIZE_C2S;
+        };
+        return ConfigAccess.getOrDefault(v, 3);
     }
 
     private static final BooleanSupplier CLIENT_PAUSE;
