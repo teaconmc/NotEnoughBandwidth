@@ -76,7 +76,7 @@ public class PresharedChunkPacketClientImpl {
     }
 
     public static ClientboundLevelChunkWithLightPacket makeVanillaChunkPacket(PresharedChunkPacket packet, PresharedChunk base) {
-        ChunkPos pos = base.pos();
+        ChunkPos pos = packet.pos();
         ClientboundLevelChunkPacketData chunk = applyChunk(packet, base);
         ClientboundLightUpdatePacketData light = applyLight(packet, base);
 

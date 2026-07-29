@@ -7,15 +7,19 @@
   "mixins": [
     "ChunkMap_TrackedEntityMixin",
     "ChunkMapMixin",
+    "ClientboundLevelChunkPacketDataMixin",
+    "ClientboundLevelChunkWithLightPacketMixin",
     "ClientPacketListenerMixin",
     "ConnectionMixin",
     "CustomPayloadPacketMixin",
+    "DataLayerMixin",
     "GameProtocolsMixin",
     "PacketDecoderMixin",
     "PacketEncoderMixin",
     "PlayerChunkSenderMixin",
     "PlayerListMixin",
     "ProtocolSwapHandlerMixin",
+    "SimpleBitStorageMixin",
     "Varint21FrameDecoderMixin",
     "Varint21LengthFieldPrependerMixin",
     "nf.NetworkRegistryMixin"
@@ -25,5 +29,8 @@
   ],
   "injectors": {
     "defaultRequire": 1
+  },
+  "mixinextras": {
+    "minVersion": "0.5.4"
   }
 }

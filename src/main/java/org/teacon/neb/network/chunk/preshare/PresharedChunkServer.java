@@ -24,6 +24,7 @@ import org.teacon.neb.network.chunk.preshare.repo.PresharedChunkSource;
 import org.teacon.neb.network.chunk.preshare.repo.PresharedChunksIO;
 import org.teacon.neb.network.chunk.preshare.repo.impl.PresharedChunkLocalSource;
 import org.teacon.neb.utils.GridPos;
+import org.teacon.neb.utils.ScopedArrayAllocator;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -40,6 +41,8 @@ public class PresharedChunkServer {
 
     @Nullable
     private static PresharedChunkSource source = null;
+
+    public static final ScopedArrayAllocator ARRAY_ALLOCATOR = new ScopedArrayAllocator();
 
     @SubscribeEvent
     private static void on(ServerStartedEvent event) throws IOException {
@@ -105,7 +108,7 @@ public class PresharedChunkServer {
         }
     }
 
-    public static PresharedChunkSource.IResult makePacket(Connection connection, LevelChunk chunk) {
+    public static PresharedChunkSource.IResult lookupChunk(Connection connection, LevelChunk chunk) {
         if (chunk.getLevel().dimension() != Level.OVERWORLD || source == null) {
             return PresharedChunkSource.Empty.INSTANCE;
         }

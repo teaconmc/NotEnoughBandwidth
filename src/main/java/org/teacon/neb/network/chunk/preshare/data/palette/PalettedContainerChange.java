@@ -11,6 +11,7 @@ import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.chunk.PalettedContainerRO;
 import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.NonNull;
+import org.teacon.neb.utils.ScopedArrayAllocator;
 import org.teacon.neb.utils.vm.VectorSupport;
 
 import java.util.ArrayList;
@@ -91,12 +92,12 @@ public record PalettedContainerChange<T>(byte bitsInMemory, byte bitsInStorage, 
                 palette = currentPaletteData;
             } else {
                 int length = currentPaletteData.length;
-                palette = new byte[length];
+                palette = ScopedArrayAllocator.allocateUninitialized(byte[].class, length);
                 VectorSupport.xor(currentPaletteData, 0, basePaletteData, 0, palette, 0, length);
             }
 
             long[] arrayBase = baseStorage.getRaw(), arrayCurrent = currentStorage.getRaw();
-            long[] result = new long[arrayBase.length];
+            long[] result = ScopedArrayAllocator.allocateUninitialized(long[].class, arrayBase.length);
             VectorSupport.xor(arrayBase, 0, arrayCurrent, 0, result, 0, arrayBase.length);
             return new PalettedContainerChange<>((byte) baseConfiguration.bitsInMemory(), (byte) baseConfiguration.bitsInStorage(), palette, result);
         } finally {
@@ -123,7 +124,7 @@ public record PalettedContainerChange<T>(byte bitsInMemory, byte bitsInStorage, 
                 paletteData = this.palette;
             } else {
                 int length = this.palette.length;
-                paletteData = new byte[length];
+                paletteData = ScopedArrayAllocator.allocateUninitialized(byte[].class, length);
                 VectorSupport.xor(basePaletteData, 0, this.palette, 0, paletteData, 0, length);
             }
 
@@ -141,7 +142,7 @@ public record PalettedContainerChange<T>(byte bitsInMemory, byte bitsInStorage, 
         try {
             getPalette(current).write(paletteBuffer, getStrategy(current).globalMap());
 
-            paletteData = new byte[paletteBuffer.readableBytes()];
+            paletteData = ScopedArrayAllocator.allocateUninitialized(byte[].class, paletteBuffer.readableBytes());
             paletteBuffer.readBytes(paletteData);
         } finally {
             paletteBuffer.release();

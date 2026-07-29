@@ -12,6 +12,7 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.lighting.LevelLightEngine;
 import net.neoforged.fml.loading.FMLEnvironment;
 import org.jetbrains.annotations.Nullable;
+import org.teacon.neb.utils.ScopedArrayAllocator;
 import org.teacon.neb.utils.vm.VectorSupport;
 
 import java.util.ArrayList;
@@ -145,13 +146,14 @@ public record LevelLightSection(
             return lights;
         }
 
-        private static byte[] diff(byte [] left, byte[] right) {
-            if (left == BYTES_2048[0]) {
-                return right.clone();
-            }
+        private static byte[] diff(byte[] left, byte[] right) {
+            byte[] bytes = ScopedArrayAllocator.allocateUninitialized(byte[].class, 2048);
 
-            byte[] bytes = new byte[2048];
-            VectorSupport.xor(left, 0, right, 0, bytes, 0, 2048);
+            if (left == BYTES_2048[0]) {
+                System.arraycopy(right, 0, bytes, 0, 2048);
+            } else {
+                VectorSupport.xor(left, 0, right, 0, bytes, 0, 2048);
+            }
             return bytes;
         }
     }

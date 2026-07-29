@@ -113,11 +113,13 @@ dependencies {
     // http://www.gradle.org/docs/current/userguide/artifact_dependencies_tutorial.html
     // http://www.gradle.org/docs/current/userguide/dependency_management.html
 
-    jarJar(implementation("io.prometheus:simpleclient:0.16.0"))
-    jarJar(implementation("io.prometheus:simpleclient_httpserver:0.16.0"))
-    jarJar(implementation("io.prometheus:simpleclient_common:0.16.0"))
+    jarJar implementation(project(":coremod"))
 
-    jarJar(implementation("com.github.luben:zstd-jni:1.5.7-11"))
+    jarJar implementation("io.prometheus:simpleclient:0.16.0")
+    jarJar implementation("io.prometheus:simpleclient_httpserver:0.16.0")
+    jarJar implementation("io.prometheus:simpleclient_common:0.16.0")
+
+    jarJar implementation("com.github.luben:zstd-jni:1.5.7-11")
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.

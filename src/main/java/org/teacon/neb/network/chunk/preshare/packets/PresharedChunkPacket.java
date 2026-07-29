@@ -11,23 +11,37 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.teacon.neb.NotEnoughBandwidth;
+import org.teacon.neb.network.IReleasablePacket;
 import org.teacon.neb.network.chunk.preshare.data.BlockEntityInfo;
 import org.teacon.neb.network.chunk.preshare.data.HeightMap;
 import org.teacon.neb.network.chunk.preshare.data.LevelLightSection;
 import org.teacon.neb.network.chunk.preshare.data.SectionInstance;
+import org.teacon.neb.utils.ScopedArrayAllocator;
 
 import java.util.List;
 
 @EventBusSubscriber
 public record PresharedChunkPacket(
+        @Nullable ScopedArrayAllocator.Scope scope,
         ChunkPos pos,
         HeightMap.Diff heightmaps,
         List<SectionInstance.Diff> sections,
         List<LevelLightSection.Diff> lights,
         List<BlockEntityInfo.Diff> blockEntities
-) implements CustomPacketPayload {
+) implements CustomPacketPayload, IReleasablePacket {
     public static final Type<PresharedChunkPacket> TYPE = new Type<>(NotEnoughBandwidth.id("s2c/preshared_chunk"));
+
+    private PresharedChunkPacket(
+            ChunkPos pos,
+            HeightMap.Diff heightmaps,
+            List<SectionInstance.Diff> sections,
+            List<LevelLightSection.Diff> lights,
+            List<BlockEntityInfo.Diff> blockEntities
+    ) {
+        this(null, pos, heightmaps, sections, lights, blockEntities);
+    }
 
     public static final StreamCodec<RegistryFriendlyByteBuf, PresharedChunkPacket> STREAM_CODEC = new StreamCodec<>() {
         public static final StreamCodec<RegistryFriendlyByteBuf, PresharedChunkPacket> DELEGATE = StreamCodec.composite(
@@ -99,6 +113,13 @@ public record PresharedChunkPacket(
     @NotNull
     public Type<? extends CustomPacketPayload> type() {
         return TYPE;
+    }
+
+    @Override
+    public void release(ReleaseContext context) {
+        if (scope != null) {
+            scope.close();
+        }
     }
 
     @SubscribeEvent

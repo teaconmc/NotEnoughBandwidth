@@ -8,6 +8,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.teacon.neb.network.IReleasablePacket;
 import org.teacon.neb.network.aggregate.compress.CompressEncoder;
 
 @Mixin(PacketEncoder.class)
@@ -22,5 +23,8 @@ public class PacketEncoderMixin {
     )
     private void afterEncodePacket(ChannelHandlerContext ctx, Packet<?> packet, ByteBuf output, CallbackInfo ci) {
         CompressEncoder.onEncodeSingle((PacketEncoder<?>) (Object) this, packet, output.readableBytes());
+        if (packet instanceof IReleasablePacket releasable) {
+            releasable.release(IReleasablePacket.ReleaseContext.INSTANCE);
+        }
     }
 }

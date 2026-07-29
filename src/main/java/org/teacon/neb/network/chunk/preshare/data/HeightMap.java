@@ -5,7 +5,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
-import org.teacon.neb.utils.ContextByteBuf;
+import org.teacon.neb.utils.ScopedArrayAllocator;
 import org.teacon.neb.utils.vm.VectorSupport;
 
 import java.util.Arrays;
@@ -23,7 +23,7 @@ public record HeightMap(
     private static final int SIZE = 37;
 
     private static final int LENGTH = SIZE * TYPES.length;
-    
+
     private static final StreamCodec<FriendlyByteBuf, long[]> FIXED_HEIGHTMAP_ARRAY = new StreamCodec<>() {
         @Override
         public long[] decode(FriendlyByteBuf buffer) {
@@ -41,12 +41,12 @@ public record HeightMap(
         }
     };
 
-    public static final StreamCodec<ContextByteBuf, HeightMap> STREAM_CODEC = StreamCodec.composite(
+    public static final StreamCodec<FriendlyByteBuf, HeightMap> STREAM_CODEC = StreamCodec.composite(
             FIXED_HEIGHTMAP_ARRAY, HeightMap::heightmap, HeightMap::new
     );
 
     public static HeightMap createCache(LevelChunk chunk) {
-        long[] data = new long[LENGTH];
+        long[] data = ScopedArrayAllocator.allocateUninitialized(long[].class, LENGTH);
         for (Map.Entry<Heightmap.Types, Heightmap> entry : chunk.getHeightmaps()) {
             int i = ObjectArrays.binarySearch(HeightMap.TYPES, entry.getKey());
             if (i >= 0) {
@@ -65,12 +65,12 @@ public record HeightMap(
                 FIXED_HEIGHTMAP_ARRAY, Diff::heightmap, Diff::new
         );
 
-        public static Diff from(LevelChunk chunk, HeightMap base) {
+        public static Diff from(HeightMap base, LevelChunk chunk) {
             if (base.heightmap.length != LENGTH) {
                 throw new AssertionError(String.format("Invalid base, expecting %d * %d bytes, but found %d bytes.", SIZE, TYPES.length, base.heightmap.length));
             }
 
-            long[] data = new long[base.heightmap.length];
+            long[] data = ScopedArrayAllocator.allocateUninitialized(long[].class, base.heightmap.length);
             for (Map.Entry<Heightmap.Types, Heightmap> entry : chunk.getHeightmaps()) {
                 int i = ObjectArrays.binarySearch(HeightMap.TYPES, entry.getKey());
                 if (i >= 0) {
