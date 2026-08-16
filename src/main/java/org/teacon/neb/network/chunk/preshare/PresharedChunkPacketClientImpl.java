@@ -134,7 +134,7 @@ public class PresharedChunkPacketClientImpl {
         byte[] lights = new byte[2048];
         VectorSupport.xor(diff, 0, base, 0, lights, 0, 2048);
 
-        if (VectorSupport.isEmpty(lights)) {
+        if (VectorSupport.isSingleValue(lights, (byte) 0)) {
             emptyYMask.set(sectionIndex);
         } else {
             yMask.set(sectionIndex);

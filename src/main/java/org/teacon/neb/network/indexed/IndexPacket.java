@@ -15,6 +15,7 @@ import net.minecraft.resources.Identifier;
 import net.neoforged.neoforge.network.registration.NetworkRegistry;
 import org.jetbrains.annotations.Nullable;
 import org.teacon.neb.NotEnoughBandwidth;
+import org.teacon.neb.network.IReleasablePacket;
 
 /**
  * Instead of vanilla {@link CustomPacketPayload},
@@ -23,7 +24,7 @@ import org.teacon.neb.NotEnoughBandwidth;
  * @author USS_Shenzhou, Burning_TNT
  */
 public record IndexPacket(PacketType<IndexPacket> type,
-                          CustomPacketPayload payload) implements Packet<PacketListener> {
+                          CustomPacketPayload payload) implements Packet<PacketListener>, IReleasablePacket {
     public static final PacketType<IndexPacket> S_TYPE = new PacketType<>(PacketFlow.SERVERBOUND, NotEnoughBandwidth.id("c2s/indexed"));
     public static final PacketType<IndexPacket> C_TYPE = new PacketType<>(PacketFlow.CLIENTBOUND, NotEnoughBandwidth.id("s2c/indexed"));
 
@@ -100,5 +101,10 @@ public record IndexPacket(PacketType<IndexPacket> type,
             case SERVERBOUND ->
                     ((ServerCommonPacketListener) listener).handleCustomPayload(payload.toVanillaServerbound());
         }
+    }
+
+    @Override
+    public void release(ReleaseContext context) {
+        IReleasablePacket.releaseIfPossible(payload);
     }
 }

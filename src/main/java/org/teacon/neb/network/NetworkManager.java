@@ -112,7 +112,7 @@ public final class NetworkManager {
         return packet;
     }
 
-    public static PacketType<?> unwrapType(Packet<?> packet) {
+    private static PacketType<?> unwrapType(Packet<?> packet) {
         return switch (packet) {
             case TypedPacket<?>(Packet<?> inner, _) -> unwrapType(inner);
             case VanillaCustomPayload payload -> new PacketType<>(packet.type().flow(), payload.payload().type().id());
@@ -128,7 +128,7 @@ public final class NetworkManager {
                 CustomPacketPayload payload = pp.payload();
                 Identifier type = payload.type().id();
 
-                if (!USER_BLACK_LIST.contains(new PacketType<>(connection.getSending(), type)) && IndexLookup.getInstance().getIndex(type) != IndexLookup.EMPTY_INT) {
+                if (IndexLookup.getInstance().getIndex(type) != IndexLookup.EMPTY_INT) {
                     packet = new IndexPacket(switch (connection.getSending()) {
                         case CLIENTBOUND -> IndexPacket.C_TYPE;
                         case SERVERBOUND -> IndexPacket.S_TYPE;
@@ -145,7 +145,7 @@ public final class NetworkManager {
             case TypedPacket<?>(Packet<?> inner, String type) -> {
                 if (inner instanceof BundlePacket<?> bundle) {
                     for (Packet<?> sub : bundle.subPackets()) {
-                        enqueuePacket(connection, new TypedPacket<>(sub, type), buffer);
+                        enqueuePacket(connection, TypedPacket.of(sub, type), buffer);
                     }
                 } else {
                     buffer.push(packet);

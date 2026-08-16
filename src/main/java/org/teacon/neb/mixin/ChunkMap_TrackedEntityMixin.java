@@ -24,7 +24,6 @@ public class ChunkMap_TrackedEntityMixin {
             at = @At("HEAD"), argsOnly = true
     )
     private Packet<?> markPacket(Packet<?> packet) {
-        return packet instanceof TypedPacket<?> ? packet : new TypedPacket<>(packet, "entity=" + entity.getType().toShortString());
+        return TypedPacket.of(packet, "entity=" + entity.getType().toShortString());
     }
-
 }

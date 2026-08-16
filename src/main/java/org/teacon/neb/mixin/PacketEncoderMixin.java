@@ -23,8 +23,6 @@ public class PacketEncoderMixin {
     )
     private void afterEncodePacket(ChannelHandlerContext ctx, Packet<?> packet, ByteBuf output, CallbackInfo ci) {
         CompressEncoder.onEncodeSingle((PacketEncoder<?>) (Object) this, packet, output.readableBytes());
-        if (packet instanceof IReleasablePacket releasable) {
-            releasable.release(IReleasablePacket.ReleaseContext.INSTANCE);
-        }
+        IReleasablePacket.releaseIfPossible(packet);
     }
 }

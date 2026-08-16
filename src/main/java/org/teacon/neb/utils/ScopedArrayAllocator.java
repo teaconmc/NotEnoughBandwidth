@@ -24,6 +24,8 @@ public final class ScopedArrayAllocator {
     public ScopedArrayAllocator() {
     }
 
+    private static final boolean ENABLED = false;
+
     public Scope newScope() {
         return new Scope();
     }
@@ -41,10 +43,10 @@ public final class ScopedArrayAllocator {
 
     private static <T> T allocateImpl(Class<T> clazz, int length, boolean zeroed) {
         if (!clazz.isArray()) {
-            throw expectingArray(clazz);
+            throw new IllegalArgumentException("Expecting array type: " + clazz);
         }
 
-        if (SCOPE.isBound()) {
+        if (ENABLED && SCOPE.isBound()) {
             return SCOPE.get().allocateScoped(clazz, length, zeroed);
         } else {
             return allocateArray(clazz, length);
@@ -196,11 +198,7 @@ public final class ScopedArrayAllocator {
     }
 
     @SuppressWarnings("unchecked")
-    private static <T> T allocateArray(Class<T> clazz, int length) {
+    private static <T /* extends array */> T allocateArray(Class<T> clazz, int length) {
         return (T) Array.newInstance(clazz.componentType(), length);
-    }
-
-    private static IllegalArgumentException expectingArray(Class<?> clazz) {
-        return new IllegalArgumentException("Expecting array type: " + clazz);
     }
 }

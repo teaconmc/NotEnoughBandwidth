@@ -42,7 +42,7 @@ public final class VectorSupport {
     private VectorSupport() {
     }
 
-    private static final MethodHandle XOR_J, XOR_Z, NON_EMPTY_B;
+    private static final MethodHandle XOR_J, XOR_Z, IS_SV_B;
 
     static {
         try {
@@ -50,7 +50,7 @@ public final class VectorSupport {
 
             XOR_J = context.resolve("xor", MethodType.methodType(void.class, long[].class, int.class, long[].class, int.class, long[].class, int.class, int.class));
             XOR_Z = context.resolve("xor", MethodType.methodType(void.class, byte[].class, int.class, byte[].class, int.class, byte[].class, int.class, int.class));
-            NON_EMPTY_B = context.resolve("isEmpty", MethodType.methodType(boolean.class, byte[].class));
+            IS_SV_B = context.resolve("isSingleValue", MethodType.methodType(boolean.class, byte[].class, byte.class));
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
         }
@@ -80,9 +80,9 @@ public final class VectorSupport {
         }
     }
 
-    public static boolean isEmpty(byte[] value) {
+    public static boolean isSingleValue(byte[] array, byte value) {
         try {
-            return (boolean) NON_EMPTY_B.invokeExact(value);
+            return (boolean) IS_SV_B.invokeExact(array, value);
         } catch (Throwable e) {
             throw LookupAccess.raise(e);
         }
@@ -112,9 +112,9 @@ public final class VectorSupport {
                 addReads.invokeExact(VectorSupport.class.getModule(), vector);
 
                 vectorized = Class.forName(VectorSupport.class.getName() + "$Vectorized");
-                LOGGER.warn("Using incubating Vector API to accelerate path calculation.");
+                LOGGER.warn("Using incubating Vector API to accelerate calculation.");
             } catch (Throwable e) {
-                LOGGER.warn("Cannot accelerate patch calculation: No Vector API available.", e);
+                LOGGER.warn("Cannot accelerate calculation: No Vector API available.", e);
             }
 
             return new Context(fallback, vectorized);
@@ -162,16 +162,16 @@ public final class VectorSupport {
             }
         }
 
-        public static boolean isEmpty(byte[] value) {
+        public static boolean isSingleValue(byte[] array, byte value) {
             int i = 0;
-            for (int bound = BYTE_SPECIES.loopBound(value.length); i < bound; i += BYTE_SPECIES.length()) {
-                ByteVector v = ByteVector.fromArray(BYTE_SPECIES, value, i);
-                if (!v.eq((byte) 0).allTrue()) {
+            for (int bound = BYTE_SPECIES.loopBound(array.length); i < bound; i += BYTE_SPECIES.length()) {
+                ByteVector v = ByteVector.fromArray(BYTE_SPECIES, array, i);
+                if (!v.eq(value).allTrue()) {
                     return false;
                 }
             }
-            for (; i < value.length; i++) {
-                if (value[i] != 0) {
+            for (; i < array.length; i++) {
+                if (array[i] != value) {
                     return false;
                 }
             }
@@ -203,16 +203,21 @@ public final class VectorSupport {
             }
         }
 
-        public static boolean isEmpty(byte[] value) {
+        public static boolean isSingleValue(byte[] array, byte value) {
+            long valueL = value & 0xFFL;
+            valueL |= valueL << 8;
+            valueL |= valueL << 16;
+            valueL |= valueL << 32;
+
             int i = 0;
-            for (int bound = value.length & ~7; i < bound; i += 8) {
-                long v = (long) B_J.get(value, i);
-                if (v != 0) {
+            for (int bound = array.length & ~7; i < bound; i += 8) {
+                long v = (long) B_J.get(array, i);
+                if (v != valueL) {
                     return false;
                 }
             }
-            for (; i < value.length; i++) {
-                if (value[i] != 0) {
+            for (; i < array.length; i++) {
+                if (array[i] != value) {
                     return false;
                 }
             }

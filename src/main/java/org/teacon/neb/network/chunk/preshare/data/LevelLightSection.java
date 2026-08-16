@@ -11,7 +11,6 @@ import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.lighting.LevelLightEngine;
 import net.neoforged.fml.loading.FMLEnvironment;
-import org.jetbrains.annotations.Nullable;
 import org.teacon.neb.utils.ScopedArrayAllocator;
 import org.teacon.neb.utils.vm.VectorSupport;
 
@@ -32,13 +31,8 @@ public record LevelLightSection(
 
     private static byte[] acquireBytes2048(int i) {
         byte[] array = BYTES_2048[i];
-        if (!FMLEnvironment.isProduction()) {
-            byte value = (byte) ((i << 4) | i);
-            for (byte b : array) {
-                if (b != value) {
-                    throw new AssertionError("Cannot reuse BYTES_2048: it has been altered!");
-                }
-            }
+        if (!FMLEnvironment.isProduction() && !VectorSupport.isSingleValue(array, (byte) ((i << 4) | i))) {
+            throw new AssertionError("Cannot reuse BYTES_2048: it has been altered!");
         }
         return array;
     }
@@ -46,9 +40,9 @@ public record LevelLightSection(
     private static final StreamCodec<ByteBuf, byte[]> CODEC_BYTES_2048 = new StreamCodec<>() {
         @Override
         public byte[] decode(ByteBuf input) {
-            byte status = input.readByte();
+            int status = input.readUnsignedByte();
             if ((status & 0x01) != 0) {
-                return acquireBytes2048((status >> 4) & 0b1111);
+                return acquireBytes2048((status >> 4) & 0xF);
             }
 
             byte[] bytes = new byte[2048];
@@ -62,19 +56,15 @@ public record LevelLightSection(
                 throw new AssertionError("length must be 2048, not " + value.length);
             }
 
-            byte b = value[0];
-            if ((b >> 4) != (b & 0b1111)) {
-                buffer.writeByte(1 | (b << 4));
-                return;
-            }
-            for (int i = 1; i < value.length; i++) {
-                if (b != value[i]) {
-                    buffer.writeByte(0);
-                    buffer.writeBytes(value);
+            for (int i = 0; i < 16; i++) {
+                if (value == BYTES_2048[i]) {
+                    buffer.writeByte(1 | (i << 4));
                     return;
                 }
             }
-            buffer.writeByte(1 | (b << 4));
+
+            buffer.writeByte(0);
+            buffer.writeBytes(value);
         }
     };
 
@@ -101,17 +91,25 @@ public record LevelLightSection(
         return lights;
     }
 
-    private static byte @Nullable [] createDataLayer(LevelLightEngine lightEngine, SectionPos pos, LightLayer type) {
+    private static byte [] createDataLayer(LevelLightEngine lightEngine, SectionPos pos, LightLayer type) {
         DataLayer data = lightEngine.getLayerListener(type).getDataLayerData(pos);
         if (data == null) {
             return acquireBytes2048(0);
+        }
+        if (data.isDefinitelyHomogenous()) {
+            return acquireBytes2048(data.get(0, 0, 0));
         }
 
         byte[] val = data.getData();
         if (val.length != 2048) {
             throw new AssertionError(String.format("LightLayer should be 2048 bytes, but found %d bytes.", val.length));
         }
-        return val;
+
+        byte first = val[0];
+        if (selF0(first) == sel0F(first) && VectorSupport.isSingleValue(val, first)) {
+            return acquireBytes2048(sel0F(first));
+        }
+        return val.clone();
     }
 
     public record Diff(
@@ -151,10 +149,20 @@ public record LevelLightSection(
 
             if (left == BYTES_2048[0]) {
                 System.arraycopy(right, 0, bytes, 0, 2048);
+            } else if (right == BYTES_2048[0]) {
+                System.arraycopy(left, 0, bytes, 0, 2048);
             } else {
                 VectorSupport.xor(left, 0, right, 0, bytes, 0, 2048);
             }
             return bytes;
         }
+    }
+
+    private static byte selF0(byte v) {
+        return (byte) ((v >> 4) & 0xF);
+    }
+
+    private static byte sel0F(byte v) {
+        return (byte) (v & 0xF);
     }
 }

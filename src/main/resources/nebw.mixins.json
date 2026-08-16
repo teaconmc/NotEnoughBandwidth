@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_25",
   "refmap": "nebw.refmap.json",
   "mixins": [
+    "BundlePacketMixin",
     "ChunkMap_TrackedEntityMixin",
     "ChunkMapMixin",
     "ClientboundLevelChunkPacketDataMixin",
@@ -21,6 +22,7 @@
     "PlayerListMixin",
     "ProtocolSwapHandlerMixin",
     "SimpleBitStorageMixin",
+    "SingleValuePaletteMixin",
     "Varint21FrameDecoderMixin",
     "Varint21LengthFieldPrependerMixin",
     "nf.NetworkRegistryMixin"

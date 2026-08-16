@@ -16,10 +16,10 @@ import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.teacon.neb.network.aggregate.compress.CompressContext;
-import org.teacon.neb.network.chunk.preshare.data.PresharedChunk;
 import org.teacon.neb.network.chunk.preshare.data.BlockEntityInfo;
 import org.teacon.neb.network.chunk.preshare.data.HeightMap;
 import org.teacon.neb.network.chunk.preshare.data.LevelLightSection;
+import org.teacon.neb.network.chunk.preshare.data.PresharedChunk;
 import org.teacon.neb.network.chunk.preshare.data.SectionInstance;
 import org.teacon.neb.network.chunk.preshare.repo.impl.PresharedChunkLocalSource;
 import org.teacon.neb.utils.ContextByteBuf;
@@ -33,14 +33,16 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.teacon.neb.utils.GridPos.GRID_SIZE;
 
@@ -81,17 +83,16 @@ public final class PresharedChunksIO {
         ServerLevel overworld = server.overworld();
         LongSet scheduled = new LongOpenHashSet();
         ThreadPoolExecutor executor = ofExecutorService("Server Chunk Compressor [Native]");
-        AtomicInteger pending = new AtomicInteger(0);
 
-        executor.submit(() -> {
-            try {
-                Files.writeString(PresharedChunkLocalSource.resolveIndex(directory), UUID.randomUUID().toString(), StandardCharsets.UTF_8);
-            } catch (IOException e) {
-                LOGGER.error("Cannot write index file.", e);
+        Thread poller = new Thread(() -> pollTasks(directory, chunks, scheduled, overworld, executor, server, future));
+        poller.setName("Server Chunk Poller");
+        poller.setDaemon(true);
+        poller.setUncaughtExceptionHandler((_, t) -> {
+            if (t != null) {
+                future.completeExceptionally(t);
             }
         });
-
-        pollTasks(directory, chunks, pending, scheduled, overworld, executor, server, future);
+        poller.start();
         return future;
     }
 
@@ -108,14 +109,14 @@ public final class PresharedChunksIO {
     private static void pollTasks(
             Path directory,
             LongIterator chunks,
-            AtomicInteger pending,
             LongSet scheduled,
             ServerLevel overworld,
             ThreadPoolExecutor executor,
             MinecraftServer server,
             CompletableFuture<Void> future
     ) {
-        while (pending.get() < executor.getMaximumPoolSize() * 4 && chunks.hasNext()) {
+        Semaphore semaphore = new Semaphore(executor.getMaximumPoolSize() * 2);
+        while (chunks.hasNext()) {
             GridPos grid = GridPos.fromChunk(ChunkPos.unpack(chunks.nextLong()));
             long gridXZ = grid.pack();
             if (scheduled.contains(gridXZ)) {
@@ -123,41 +124,62 @@ public final class PresharedChunksIO {
             }
             scheduled.add(gridXZ);
 
-            List<PresharedChunk> value = new ArrayList<>(GRID_SIZE * GRID_SIZE);
+            semaphore.acquireUninterruptibly();
+
+            PresharedChunk[] values = new PresharedChunk[GRID_SIZE * GRID_SIZE];
+            CompletableFuture<?>[] futures = new CompletableFuture[values.length];
             for (int dx = 0; dx < GRID_SIZE; dx++) {
                 for (int dz = 0; dz < GRID_SIZE; dz++) {
-                    value.add(PresharedChunk.createCache(overworld.getChunk(grid.x() * GRID_SIZE + dx, grid.z() * GRID_SIZE + dz)));
+                    int index = dx * GRID_SIZE + dz;
+
+                    int chunkX = grid.x() * GRID_SIZE + dx, chunkZ = grid.z() * GRID_SIZE + dz;
+                    CompletableFuture<?> f = futures[index] = new CompletableFuture<>();
+                    server.schedule(server.wrapRunnable(() -> {
+                        try {
+                            values[index] = PresharedChunk.createCache(overworld.getChunk(chunkX, chunkZ));
+                            f.complete(null);
+                        } catch (Throwable t) {
+                            f.completeExceptionally(t);
+                        }
+                    }));
                 }
             }
-
-            pending.getAndIncrement();
-            executor.submit(() -> {
-                try {
-                    write(directory.resolve(PresharedChunkLocalSource.getName(gridXZ)), gridXZ, value, server.registryAccess());
-                } catch (Throwable t) {
-                    LOGGER.error("Cannot create preshared chunks for grid: {}", GridPos.unpack(gridXZ), t);
+            try {
+                for (CompletableFuture<?> f : futures) {
+                    f.join();
                 }
 
-                if (pending.decrementAndGet() < executor.getMaximumPoolSize() * 4) {
-                    server.execute(() -> pollTasks(directory, chunks, pending, scheduled, overworld, executor, server, future));
-                }
-            });
-        }
-
-        if (!chunks.hasNext()) {
-            executor.shutdown();
-            Thread.startVirtualThread(() -> {
-                try {
-                    if (!executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS)) {
-                        throw new AssertionError();
+                executor.submit(() -> {
+                    try {
+                        write(directory.resolve(PresharedChunkLocalSource.getName(gridXZ)), gridXZ, Arrays.asList(values), server.registryAccess());
+                    } catch (Throwable t) {
+                        LOGGER.error("Cannot create preshared chunks for grid: {}", GridPos.unpack(gridXZ), t);
                     }
-                } catch (InterruptedException e) {
-                    throw new AssertionError(e);
-                }
 
-                future.complete(null);
-            });
+                    semaphore.release();
+                });
+            } catch (CompletionException t) {
+                future.completeExceptionally(t);
+                semaphore.release();
+            }
         }
+
+        executor.shutdown();
+
+        try {
+            Files.writeString(PresharedChunkLocalSource.resolveIndex(directory), UUID.randomUUID().toString(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            LOGGER.error("Cannot write index file.", e);
+        }
+
+        try {
+            if (!executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS)) {
+                throw new AssertionError();
+            }
+        } catch (InterruptedException e) {
+            throw new AssertionError(e);
+        }
+        future.complete(null);
     }
 
     private static void write(Path resolve, long gridXZ, List<PresharedChunk> value, RegistryAccess registryAccess) {

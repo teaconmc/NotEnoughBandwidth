@@ -27,7 +27,7 @@ public record PresharedChunk(
         return new PresharedChunk(pos, heightmaps, sections, lights, blockEntities);
     }
 
-    public PresharedChunkPacket createDiff(@Nullable LevelChunk chunk) {
+    public PresharedChunkPacket createDiff(LevelChunk chunk) {
         ScopedArrayAllocator.Scope scope = PresharedChunkServer.ARRAY_ALLOCATOR.newScope();
         return scope.call(() -> {
             ChunkPos pos = chunk.getPos();

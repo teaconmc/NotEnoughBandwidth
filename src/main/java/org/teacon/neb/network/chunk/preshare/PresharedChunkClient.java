@@ -70,12 +70,10 @@ public class PresharedChunkClient {
 
         String version = connection.channel().attr(SOURCE_VERSION).get();
         if (version != null && !version.isEmpty()) {
-            Path path = locatePresharedDirectory(connection, version);
-            if (path == null) {
-                return;
+            Path path = locatePresharedDirectory(version);
+            if (path != null) {
+                sources.add(new PresharedChunkLocalSource(path));
             }
-
-            sources.add(new PresharedChunkLocalSource(path));
 
             String url = NEBConfigs.PRESHARED_CHUNK_DYNAMIC_DISPATCH_URL.get();
             if (!url.isEmpty()) {
@@ -115,7 +113,7 @@ public class PresharedChunkClient {
     }
 
     @Nullable
-    private static Path locatePresharedDirectory(Connection connection, String version) throws IOException {
+    private static Path locatePresharedDirectory(String version) throws IOException {
         Path root = Minecraft.getInstance().gameDirectory.toPath().resolve("preshared-chunks");
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(root)) {
             for (Path edition : stream) {
@@ -131,7 +129,6 @@ public class PresharedChunkClient {
             }
         }
 
-        connection.disconnect(Component.translatable("neb.preshared.bundle_missing", version));
         return null;
     }
 

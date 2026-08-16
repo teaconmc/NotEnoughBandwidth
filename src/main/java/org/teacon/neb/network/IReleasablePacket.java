@@ -1,9 +1,15 @@
 package org.teacon.neb.network;
 
 public interface IReleasablePacket {
-    record ReleaseContext() {
-        public static final ReleaseContext INSTANCE = new ReleaseContext();
+    void release(ReleaseContext context);
+
+    static void releaseIfPossible(Object object) {
+        if (object instanceof IReleasablePacket releasable) {
+            releasable.release(ReleaseContext.INSTANCE);
+        }
     }
 
-    void release(ReleaseContext context);
+    record ReleaseContext() {
+        private static final ReleaseContext INSTANCE = new ReleaseContext();
+    }
 }

@@ -130,6 +130,8 @@ public final class PresharedChunkSource {
             case FAILED, CANCELLED -> {
                 if (request.timestamp >= System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(NEBConfigs.PRESHARED_CHUNK_RETRY_TIMEOUT.get())) {
                     return Failed.INSTANCE;
+                } else {
+                    futures.remove(gridXZ);
                 }
             }
         }

@@ -3,15 +3,16 @@ package org.teacon.neb;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongIterators;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.level.ChunkPos;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.teacon.neb.network.chunk.preshare.repo.PresharedChunksIO;
-import org.teacon.neb.utils.GridPos;
 
 import java.net.URI;
 import java.net.URLDecoder;
@@ -38,7 +39,17 @@ public interface NotEnoughBandwidthAPI {
             throw new IllegalArgumentException("No Minecraft server is running!");
         }
 
-        return server.submit(() -> PresharedChunksIO.save(directory, iterator));
+        CompletableFuture<@Nullable Void> future = new CompletableFuture<>();
+        server.schedule(server.wrapRunnable(() -> {
+            PresharedChunksIO.save(directory, iterator).whenComplete((v, t) -> {
+                if (t == null) {
+                    future.complete(v);
+                } else {
+                    future.completeExceptionally(t);
+                }
+            });
+        }));
+        return future;
     }
 
     @EventBusSubscriber(Dist.DEDICATED_SERVER)
@@ -77,7 +88,7 @@ public interface NotEnoughBandwidthAPI {
 
                             @Override
                             protected long get(int location) {
-                                return GridPos.pack(location % W - W / 2, location / W - W / 2);
+                                return ChunkPos.pack(location % W - W / 2, location / W - W / 2);
                             }
 
                             @Override
@@ -90,14 +101,14 @@ public interface NotEnoughBandwidthAPI {
                                 return W * W;
                             }
                         }
-                ).thenRun(() -> {
+                ).whenComplete((_, throwable) -> {
+                    if (throwable != null) {
+                        LOGGER.warn("Cannot create Preshared Chunk Bundle for teacon-2026", throwable);
+                    }
+
                     MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
                     if (server != null) {
                         server.halt(false);
-                    }
-                }).whenComplete((_, throwable) -> {
-                    if (throwable != null) {
-                        LOGGER.warn("Cannot create Preshared Chunk Bundle for teacon-2026");
                     }
                 });
             } else {
