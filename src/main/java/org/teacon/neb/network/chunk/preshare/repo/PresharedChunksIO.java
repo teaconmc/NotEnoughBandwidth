@@ -9,8 +9,15 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ChunkMap;
+import net.minecraft.server.level.ChunkResult;
+import net.minecraft.server.level.ServerChunkCache;
+import net.minecraft.server.level.Ticket;
+import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.neoforged.neoforge.network.connection.ConnectionType;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import org.slf4j.Logger;
@@ -24,11 +31,14 @@ import org.teacon.neb.network.chunk.preshare.data.SectionInstance;
 import org.teacon.neb.network.chunk.preshare.repo.impl.PresharedChunkLocalSource;
 import org.teacon.neb.utils.ContextByteBuf;
 import org.teacon.neb.utils.GridPos;
+import org.teacon.neb.utils.vm.LookupAccess;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodType;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,16 +48,38 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 
 import static org.teacon.neb.utils.GridPos.GRID_SIZE;
 
 public final class PresharedChunksIO {
     private static final Logger LOGGER = LoggerFactory.getLogger(PresharedChunksIO.class);
+
+    private static final MethodHandle RUN_DISTANCE_MANAGER_UPDATES;
+    private static final MethodHandle GET_CHUNK_FUTURE_MAIN_THREAD;
+    private static final MethodHandle PROCESS_UNLOAD;
+
+    static {
+        try {
+            RUN_DISTANCE_MANAGER_UPDATES = LookupAccess.IMPL_LOOKUP.findVirtual(
+                    ServerChunkCache.class, "runDistanceManagerUpdates", MethodType.methodType(boolean.class)
+            );
+
+            GET_CHUNK_FUTURE_MAIN_THREAD = LookupAccess.IMPL_LOOKUP.findVirtual(
+                    ServerChunkCache.class, "getChunkFutureMainThread", MethodType.methodType(CompletableFuture.class, int.class, int.class, ChunkStatus.class, boolean.class)
+            );
+
+            PROCESS_UNLOAD = LookupAccess.IMPL_LOOKUP.findVirtual(
+                    ChunkMap.class, "processUnloads", MethodType.methodType(void.class, BooleanSupplier.class)
+            );
+        } catch (ReflectiveOperationException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
 
     private PresharedChunksIO() {
     }
@@ -80,11 +112,11 @@ public final class PresharedChunksIO {
         MinecraftServer server = Objects.requireNonNull(ServerLifecycleHooks.getCurrentServer());
 
         CompletableFuture<Void> future = new CompletableFuture<>();
-        ServerLevel overworld = server.overworld();
+        ServerChunkCache chunkSource = server.overworld().getChunkSource();
         LongSet scheduled = new LongOpenHashSet();
         ThreadPoolExecutor executor = ofExecutorService("Server Chunk Compressor [Native]");
 
-        Thread poller = new Thread(() -> pollTasks(directory, chunks, scheduled, overworld, executor, server, future));
+        Thread poller = new Thread(() -> pollTasks(directory, chunks, scheduled, chunkSource, executor, server, future));
         poller.setName("Server Chunk Poller");
         poller.setDaemon(true);
         poller.setUncaughtExceptionHandler((_, t) -> {
@@ -99,7 +131,7 @@ public final class PresharedChunksIO {
     public static ThreadPoolExecutor ofExecutorService(String name) {
         int count = Runtime.getRuntime().availableProcessors();
         return new ThreadPoolExecutor(
-                0, count,
+                count, count,
                 30, TimeUnit.SECONDS,
                 new LinkedBlockingQueue<>(),
                 Thread.ofPlatform().name("NEB " + name).daemon().factory()
@@ -110,62 +142,89 @@ public final class PresharedChunksIO {
             Path directory,
             LongIterator chunks,
             LongSet scheduled,
-            ServerLevel overworld,
+            ServerChunkCache chunkSource,
             ThreadPoolExecutor executor,
             MinecraftServer server,
             CompletableFuture<Void> future
     ) {
-        Semaphore semaphore = new Semaphore(executor.getMaximumPoolSize() * 2);
+        int permits = executor.getMaximumPoolSize() + 4;
+        Semaphore semaphore = new Semaphore(permits);
         while (chunks.hasNext()) {
             GridPos grid = GridPos.fromChunk(ChunkPos.unpack(chunks.nextLong()));
-            long gridXZ = grid.pack();
-            if (scheduled.contains(gridXZ)) {
+            if (!scheduled.add(grid.pack())) {
                 continue;
             }
-            scheduled.add(gridXZ);
 
             semaphore.acquireUninterruptibly();
+            CompletableFuture.completedFuture(new PresharedChunk[GRID_SIZE * GRID_SIZE])
+                    .thenComposeAsync(values -> {
+                        TicketType ticketType = new TicketType(0L, 15);
 
-            PresharedChunk[] values = new PresharedChunk[GRID_SIZE * GRID_SIZE];
-            CompletableFuture<?>[] futures = new CompletableFuture[values.length];
-            for (int dx = 0; dx < GRID_SIZE; dx++) {
-                for (int dz = 0; dz < GRID_SIZE; dz++) {
-                    int index = dx * GRID_SIZE + dz;
-
-                    int chunkX = grid.x() * GRID_SIZE + dx, chunkZ = grid.z() * GRID_SIZE + dz;
-                    CompletableFuture<?> f = futures[index] = new CompletableFuture<>();
-                    server.schedule(server.wrapRunnable(() -> {
-                        try {
-                            values[index] = PresharedChunk.createCache(overworld.getChunk(chunkX, chunkZ));
-                            f.complete(null);
-                        } catch (Throwable t) {
-                            f.completeExceptionally(t);
+                        for (int dx = 0; dx < GRID_SIZE; dx++) {
+                            for (int dz = 0; dz < GRID_SIZE; dz++) {
+                                int chunkX = grid.x() * GRID_SIZE + dx, chunkZ = grid.z() * GRID_SIZE + dz;
+                                chunkSource.addTicket(new Ticket(ticketType, 33), new ChunkPos(chunkX, chunkZ));
+                            }
                         }
-                    }));
-                }
-            }
-            try {
-                for (CompletableFuture<?> f : futures) {
-                    f.join();
-                }
+                        try {
+                            boolean _ = (boolean) RUN_DISTANCE_MANAGER_UPDATES.invokeExact(chunkSource);
+                        } catch (Throwable t) {
+                            throw LookupAccess.raise(t);
+                        }
 
-                executor.submit(() -> {
-                    try {
-                        write(directory.resolve(PresharedChunkLocalSource.getName(gridXZ)), gridXZ, Arrays.asList(values), server.registryAccess());
-                    } catch (Throwable t) {
-                        LOGGER.error("Cannot create preshared chunks for grid: {}", GridPos.unpack(gridXZ), t);
-                    }
+                        CompletableFuture<?>[] futures = new CompletableFuture[values.length];
+                        for (int dx = 0; dx < GRID_SIZE; dx++) {
+                            for (int dz = 0; dz < GRID_SIZE; dz++) {
+                                int index = dx * GRID_SIZE + dz;
+                                int chunkX = grid.x() * GRID_SIZE + dx, chunkZ = grid.z() * GRID_SIZE + dz;
 
-                    semaphore.release();
-                });
-            } catch (CompletionException t) {
-                future.completeExceptionally(t);
-                semaphore.release();
-            }
+                                futures[index] = CompletableFuture.completedFuture(null)
+                                        .thenComposeAsync(_ -> {
+                                            try {
+                                                // noinspection unchecked
+                                                return (CompletableFuture<ChunkResult<ChunkAccess>>) GET_CHUNK_FUTURE_MAIN_THREAD
+                                                        .invokeExact(chunkSource, chunkX, chunkZ, ChunkStatus.FULL, false);
+                                            } catch (Throwable t) {
+                                                throw LookupAccess.raise(t);
+                                            }
+                                        }, server)
+                                        .thenAccept(chunk -> {
+                                            values[index] = PresharedChunk.createCache((LevelChunk) chunk.orElseThrow(IllegalStateException::new));
+                                        });
+                            }
+                        }
+
+                        return CompletableFuture.allOf(futures).thenApply(_ -> values)
+                                .whenCompleteAsync((_, _) -> {
+                                    for (int dx = 0; dx < GRID_SIZE; dx++) {
+                                        for (int dz = 0; dz < GRID_SIZE; dz++) {
+                                            int chunkX = grid.x() * GRID_SIZE + dx, chunkZ = grid.z() * GRID_SIZE + dz;
+                                            chunkSource.removeTicketWithRadius(ticketType, new ChunkPos(chunkX, chunkZ), 0);
+                                        }
+                                    }
+
+                                    try {
+                                        boolean _ = (boolean) RUN_DISTANCE_MANAGER_UPDATES.invokeExact(chunkSource);
+                                        PROCESS_UNLOAD.invokeExact(chunkSource.chunkMap, (BooleanSupplier) () -> true);
+                                    } catch (Throwable t) {
+                                        throw LookupAccess.raise(t);
+                                    }
+                                }, server);
+                    }, server)
+                    .thenAcceptAsync(values -> {
+                        write(directory.resolve(PresharedChunkLocalSource.getName(grid.pack())), grid.pack(), Arrays.asList(values), server.registryAccess());
+                    }, executor)
+                    .whenComplete((_, t) -> {
+                        semaphore.release();
+                        if (t != null) {
+                            LOGGER.error("Cannot create preshared chunks for grid: {}", GridPos.unpack(grid.pack()), t);
+                            future.completeExceptionally(t);
+                        }
+                    });
         }
 
+        semaphore.acquireUninterruptibly(permits);
         executor.shutdown();
-
         try {
             Files.writeString(PresharedChunkLocalSource.resolveIndex(directory), UUID.randomUUID().toString(), StandardCharsets.UTF_8);
         } catch (IOException e) {
@@ -179,6 +238,8 @@ public final class PresharedChunksIO {
         } catch (InterruptedException e) {
             throw new AssertionError(e);
         }
+
+        LOGGER.info("Done. All requested files have been saved to {}", directory);
         future.complete(null);
     }
 
