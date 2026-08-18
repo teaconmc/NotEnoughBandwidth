@@ -3,8 +3,15 @@ package org.teacon.neb.network.chunk.preshare;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import net.minecraft.network.Connection;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -19,10 +26,13 @@ import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 import org.teacon.neb.NEBConfigs;
 import org.teacon.neb.NotEnoughBandwidth;
+import org.teacon.neb.network.chunk.preshare.data.PresharedChunk;
 import org.teacon.neb.network.chunk.preshare.packets.PresharedChunkVersionPacket;
 import org.teacon.neb.network.chunk.preshare.repo.PresharedChunkSource;
 import org.teacon.neb.network.chunk.preshare.repo.PresharedChunksIO;
 import org.teacon.neb.network.chunk.preshare.repo.impl.PresharedChunkLocalSource;
+import org.teacon.neb.profiler.ChunkSendingEvent;
+import org.teacon.neb.profiler.ProfilerChannel;
 import org.teacon.neb.utils.GridPos;
 import org.teacon.neb.utils.ScopedArrayAllocator;
 
@@ -108,14 +118,45 @@ public class PresharedChunkServer {
         }
     }
 
-    public static PresharedChunkSource.IResult lookupChunk(Connection connection, LevelChunk chunk) {
+    private static final PresharedChunkSource.Empty INSTANCE_REJECTED = new PresharedChunkSource.Empty(); // FIXME: Dirty implementation!
+
+    @Nullable
+    public static Packet<? super ClientGamePacketListener> sendChunk(ServerGamePacketListenerImpl connection, ServerLevel level, LevelChunk chunk, ProfilerFiller profiler) {
+        PresharedChunkSource.IResult result = lookupChunk(connection.getConnection(), chunk);
+        return switch (result) {
+            case PresharedChunkSource.Empty _, PresharedChunkSource.Failed _ -> {
+                ProfilerChannel.SERVER.onChunkSendingEvent(
+                        result == INSTANCE_REJECTED ? ChunkSendingEvent.SEND_PRESHARED_REJECTED_THEN_VANILLA : ChunkSendingEvent.SEND_VANILLA
+                );
+                yield new ClientboundLevelChunkWithLightPacket(chunk, level.getLightEngine(), null, null);
+            }
+            case PresharedChunkSource.Loaded(PresharedChunk preshared) -> {
+                ProfilerChannel.SERVER.onChunkSendingEvent(ChunkSendingEvent.SEND_PRESHARED);
+
+                profiler.push("createChunkDiff");
+                ClientboundCustomPayloadPacket packet = preshared.createDiff(chunk).toVanillaClientbound();
+                profiler.pop();
+                yield packet;
+            }
+            case PresharedChunkSource.Pending pending -> {
+                pending.thenRunAsync(_ -> {
+                    if (connection.player.level() == level && connection.player.getChunkTrackingView().contains(chunk.getPos())) {
+                        connection.chunkSender.markChunkPendingToSend(chunk);
+                    }
+                });
+                yield null;
+            }
+        };
+    }
+
+    private static PresharedChunkSource.IResult lookupChunk(Connection connection, LevelChunk chunk) {
         if (chunk.getLevel().dimension() != Level.OVERWORLD || source == null) {
             return PresharedChunkSource.Empty.INSTANCE;
         }
 
         long[] chunks = connection.channel().attr(FORCE_VANILLA_CHUNKS).get();
         if (chunks != null && PresharedRejection.isRejected(chunks, GridPos.fromChunk(chunk.getPos()).pack())) {
-            return PresharedChunkSource.Empty.INSTANCE;
+            return INSTANCE_REJECTED;
         }
 
         return source.load(chunk.getPos().pack(), true);

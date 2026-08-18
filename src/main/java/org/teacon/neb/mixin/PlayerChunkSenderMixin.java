@@ -4,7 +4,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBundlePacket;
-import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.network.PlayerChunkSender;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
@@ -16,8 +15,6 @@ import net.neoforged.neoforge.network.payload.AuxiliaryLightDataPayload;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Unique;
-import org.teacon.neb.network.chunk.preshare.data.PresharedChunk;
-import org.teacon.neb.network.chunk.preshare.repo.PresharedChunkSource;
 import org.teacon.neb.network.chunk.preshare.PresharedChunkServer;
 import org.teacon.neb.utils.vm.LookupAccess;
 
@@ -47,23 +44,9 @@ public class PlayerChunkSenderMixin {
     private static void sendChunk(ServerGamePacketListenerImpl connection, ServerLevel level, LevelChunk chunk) {
         ProfilerFiller profiler = Profiler.get();
 
-        Packet<? super ClientGamePacketListener> packet;
-        switch (PresharedChunkServer.lookupChunk(connection.getConnection(), chunk)) {
-            case PresharedChunkSource.Empty _, PresharedChunkSource.Failed _ ->
-                    packet = new ClientboundLevelChunkWithLightPacket(chunk, level.getLightEngine(), null, null);
-            case PresharedChunkSource.Loaded(PresharedChunk preshared) -> {
-                profiler.push("createChunkDiff");
-                packet = preshared.createDiff(chunk).toVanillaClientbound();
-                profiler.pop();
-            }
-            case PresharedChunkSource.Pending pending -> {
-                pending.thenRunAsync(_ -> {
-                    if (connection.player.level() == level && connection.player.getChunkTrackingView().contains(chunk.getPos())) {
-                        connection.chunkSender.markChunkPendingToSend(chunk);
-                    }
-                });
-                return;
-            }
+        Packet<? super ClientGamePacketListener> packet = PresharedChunkServer.sendChunk(connection, level, chunk, profiler);
+        if (packet == null) {
+            return;
         }
 
         @SuppressWarnings("unchecked")

@@ -2,6 +2,7 @@ package org.teacon.neb.profiler.impl;
 
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
+import org.teacon.neb.profiler.ChunkSendingEvent;
 import org.teacon.neb.profiler.ProfilerChannel;
 import org.teacon.neb.profiler.Snapshot;
 
@@ -36,6 +37,7 @@ public class SimpleProfiler implements ProfilerChannel.IProfiler {
     private final long startTime = System.currentTimeMillis();
     private int transmit, receive, transmitCompressed, receiveCompressed;
     private final Object2LongMap<String> summary = new Object2LongOpenHashMap<>();
+    private final int[] chunkEvents = new int[ChunkSendingEvent.values().length];
 
     @Override
     public synchronized void onTransmitPacket(Snapshot snapshot) {
@@ -68,6 +70,11 @@ public class SimpleProfiler implements ProfilerChannel.IProfiler {
         }
     }
 
+    @Override
+    public synchronized void onChunkUpdate(ChunkSendingEvent event) {
+        chunkEvents[event.ordinal()]++;
+    }
+
     public synchronized String build() {
         CSVWriter writer = new CSVWriter(new StringBuilder());
 
@@ -85,6 +92,13 @@ public class SimpleProfiler implements ProfilerChannel.IProfiler {
             long summary = entry.getLongValue();
             writer.line(entry.getKey(), Summary.unpackTransmit(summary), Summary.unpackReceive(summary), Summary.unpackRatio(summary));
         });
+
+        writer.line()
+                .line("### Chunk Events ###");
+
+        for (int i = 0; i < chunkEvents.length; i++) {
+            writer.line(ChunkSendingEvent.values()[i].name(), chunkEvents[i]);
+        }
 
         return writer.builder.toString();
     }

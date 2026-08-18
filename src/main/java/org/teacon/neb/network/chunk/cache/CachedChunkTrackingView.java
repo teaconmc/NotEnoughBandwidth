@@ -14,6 +14,8 @@ import org.intellij.lang.annotations.MagicConstant;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.teacon.neb.NEBConfigs;
+import org.teacon.neb.profiler.ChunkSendingEvent;
+import org.teacon.neb.profiler.ProfilerChannel;
 
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -165,9 +167,8 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
             ChunkTrackingView.difference(major, next, chunkPos -> {
                 if (cache.remove(chunkPos.pack()) == NO_CACHE) {
                     context.startChunkTracking(chunkPos);
-                    LOGGER.trace("Cache miss at {} in {}'s chunk cache.", chunkPos, player.getPlainTextName());
                 } else {
-                    LOGGER.trace("Cache hit at {} in {}'s chunk cache.", chunkPos, player.getPlainTextName());
+                    ProfilerChannel.SERVER.onChunkSendingEvent(ChunkSendingEvent.CACHED);
                 }
             }, chunkPos -> {
                 if (next.center().getChessboardDistance(chunkPos) <= chunkCacheDistance) {
@@ -181,7 +182,6 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
                     ChunkPos chunkPos = ChunkPos.unpack(pos);
 
                     context.stopChunkTracking(chunkPos);
-                    LOGGER.trace("Remove {} from {}'s chunk cache: too far away.", chunkPos, player.getPlainTextName());
                     return CacheConsumer.REMOVE;
                 }
                 return CacheConsumer.CONTINUE;
@@ -192,9 +192,7 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
         enumerate((pos, time) -> {
             boolean legacy = time <= now - chunkCacheTimeoutMilli;
             if (legacy || cache.size() >= chunkCacheBufferSize) {
-                ChunkPos chunkPos = ChunkPos.unpack(pos);
-                context.stopChunkTracking(chunkPos);
-                LOGGER.trace("Remove {} from {}'s chunk cache: {}", chunkPos, player.getPlainTextName(), legacy ? "timeout" : "buffer is full");
+                context.stopChunkTracking(ChunkPos.unpack(pos));
                 return CacheConsumer.REMOVE;
             } else {
                 return CacheConsumer.STOP;

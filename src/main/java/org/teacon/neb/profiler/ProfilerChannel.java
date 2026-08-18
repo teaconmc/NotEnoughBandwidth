@@ -20,6 +20,8 @@ public final class ProfilerChannel {
         void onTransmitPacket(Snapshot snapshot);
 
         void onReceivePacket(Snapshot snapshot);
+
+        void onChunkUpdate(ChunkSendingEvent event);
     }
 
     public static final ProfilerChannel CLIENT = new ProfilerChannel();
@@ -129,6 +131,18 @@ public final class ProfilerChannel {
             IProfiler[] profilers = this.profilers;
             for (IProfiler profiler : profilers) {
                 profiler.onReceivePacket(snapshot);
+            }
+        } finally {
+            READ.unlock();
+        }
+    }
+
+    public void onChunkSendingEvent(ChunkSendingEvent event) {
+        READ.lock();
+        try {
+            IProfiler[] profilers = this.profilers;
+            for (IProfiler profiler : profilers) {
+                profiler.onChunkUpdate(event);
             }
         } finally {
             READ.unlock();

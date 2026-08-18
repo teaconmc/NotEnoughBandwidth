@@ -99,4 +99,8 @@ public final class ClientProfiler implements ProfilerChannel.IProfiler {
         rx.add(snapshot.getTotalSize());
         rxIO.add(snapshot.getCompressedSize());
     }
+
+    @Override
+    public void onChunkUpdate(ChunkSendingEvent event) {
+    }
 }
