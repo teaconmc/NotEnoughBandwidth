@@ -16,7 +16,9 @@ import net.minecraft.server.level.Ticket;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ImposterProtoChunk;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.ProtoChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.neoforged.neoforge.network.connection.ConnectionType;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
@@ -183,13 +185,21 @@ public final class PresharedChunksIO {
                                             try {
                                                 // noinspection unchecked
                                                 return (CompletableFuture<ChunkResult<ChunkAccess>>) GET_CHUNK_FUTURE_MAIN_THREAD
-                                                        .invokeExact(chunkSource, chunkX, chunkZ, ChunkStatus.FULL, false);
+                                                        .invokeExact(chunkSource, chunkX, chunkZ, ChunkStatus.SPAWN, false);
                                             } catch (Throwable t) {
                                                 throw LookupAccess.raise(t);
                                             }
                                         }, server)
                                         .thenAccept(chunk -> {
-                                            values[index] = PresharedChunk.createCache((LevelChunk) chunk.orElseThrow(IllegalStateException::new));
+                                            LevelChunk loaded = switch (chunk.orElseThrow(IllegalStateException::new)) {
+                                                case LevelChunk c -> c;
+                                                case ImposterProtoChunk c -> c.getWrapped();
+                                                case ProtoChunk proto -> new LevelChunk(chunkSource.level, proto, _ -> {
+                                                });
+                                                default -> throw new UnsupportedOperationException();
+                                            };
+
+                                            values[index] = PresharedChunk.createCache(loaded);
                                         });
                             }
                         }
