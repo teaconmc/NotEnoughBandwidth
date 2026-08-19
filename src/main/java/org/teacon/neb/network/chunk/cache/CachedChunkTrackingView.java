@@ -104,9 +104,11 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
     }
 
     public interface Context {
-        void startChunkTracking(ChunkPos pos);
+        void sendChunk(ChunkPos pos);
 
-        void stopChunkTracking(ChunkPos pos);
+        void dropChunk(ChunkPos pos);
+
+        void addTicket(ChunkPos pos);
     }
 
     /**
@@ -142,21 +144,22 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
 
         // Use an in-place tick operation on CachedChunkTrackingView if possible, otherwise, create a new CachedChunkTrackingView.
         if (currentTrackingView instanceof CachedChunkTrackingView cachedView) {
-            cachedView.tick(player, Objects.requireNonNullElse(nextPositioned, cachedView.major), context);
+            cachedView.tick(Objects.requireNonNullElse(nextPositioned, cachedView.major), context);
         } else if (nextPositioned != null) {
             CachedChunkTrackingView cachedView = new CachedChunkTrackingView(nextPositioned);
-            ChunkTrackingView.difference(currentTrackingView, cachedView, context::startChunkTracking, context::stopChunkTracking);
+            ChunkTrackingView.difference(currentTrackingView, cachedView, context::sendChunk, context::dropChunk);
 
             player.setChunkTrackingView(cachedView);
         }
     }
 
-    private void tick(ServerPlayer player, ChunkTrackingView.Positioned next, Context context) {
+    private void tick(ChunkTrackingView.Positioned next, Context context) {
         long now = System.currentTimeMillis();
         int chunkCacheBufferSize = NEBConfigs.CHUNK_CACHE_BUFFER_SIZE.get();
         int chunkCacheDistance = next.viewDistance() + NEBConfigs.CHUNK_CACHE_DISTANCE.get();
         int chunkCacheTimeout = NEBConfigs.CHUNK_CACHE_TIMEOUT.get();
         long chunkCacheTimeoutMilli = TimeUnit.SECONDS.toMillis(chunkCacheTimeout);
+        boolean addTicket = NEBConfigs.CHUNK_CACHE_EAGERLY.get();
 
         if (!major.equals(next)) {
             // Update chunk tracking view.
@@ -166,13 +169,16 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
             // 2. For newly-invisible chunks, if they are within cache distance, push them into cache.
             ChunkTrackingView.difference(major, next, chunkPos -> {
                 if (cache.remove(chunkPos.pack()) == NO_CACHE) {
-                    context.startChunkTracking(chunkPos);
+                    context.sendChunk(chunkPos);
                 } else {
                     ProfilerChannel.SERVER.onChunkSendingEvent(ChunkSendingEvent.CACHED);
                 }
             }, chunkPos -> {
                 if (next.center().getChessboardDistance(chunkPos) <= chunkCacheDistance) {
                     cache.put(chunkPos.pack(), now);
+                    if (addTicket) {
+                        context.addTicket(chunkPos);
+                    }
                 }
             });
 
@@ -181,7 +187,7 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
                 if (next.center().getChessboardDistance(ChunkPos.getX(pos), ChunkPos.getZ(pos)) > chunkCacheDistance) {
                     ChunkPos chunkPos = ChunkPos.unpack(pos);
 
-                    context.stopChunkTracking(chunkPos);
+                    context.dropChunk(chunkPos);
                     return CacheConsumer.REMOVE;
                 }
                 return CacheConsumer.CONTINUE;
@@ -192,7 +198,7 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
         enumerate((pos, time) -> {
             boolean legacy = time <= now - chunkCacheTimeoutMilli;
             if (legacy || cache.size() >= chunkCacheBufferSize) {
-                context.stopChunkTracking(ChunkPos.unpack(pos));
+                context.dropChunk(ChunkPos.unpack(pos));
                 return CacheConsumer.REMOVE;
             } else {
                 return CacheConsumer.STOP;

@@ -30,6 +30,7 @@ import java.util.Objects;
 public final class NEBConfigs {
     public static ModConfigSpec.ConfigValue<Integer> COMPRESS_WINDOW_SIZE_LOG;
 
+    public static ModConfigSpec.ConfigValue<Boolean> CHUNK_CACHE_EAGERLY;
     public static ModConfigSpec.ConfigValue<Integer> CHUNK_CACHE_BUFFER_SIZE;
     public static ModConfigSpec.ConfigValue<Integer> CHUNK_CACHE_DISTANCE;
     public static ModConfigSpec.ConfigValue<Integer> CHUNK_CACHE_TIMEOUT;
@@ -65,6 +66,14 @@ public final class NEBConfigs {
                         - The cache exceeds the configured size limit, in which case the oldest cached chunks are removed first.
                         """))
                 .push("chunk_cache");
+        CHUNK_CACHE_EAGERLY = server
+                .comment(formatComments("""
+                        [WARNING: May impact performance]
+                        Whether cached chunks should stay active if others doesn't load it.
+                        If false, chunks will be unloaded if others doesn't load it and sync to client
+                        next time when it becomes visible.
+                        """))
+                .define("aggressively", true);
         CHUNK_CACHE_BUFFER_SIZE = server
                 .comment(formatComments("The maximum capacity of the cache queue for recently visited chunks."))
                 .defineInRange("buffer_size", 60, 0, Integer.MAX_VALUE);

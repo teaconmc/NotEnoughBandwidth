@@ -199,7 +199,7 @@ public final class PresharedChunkSource {
                 return null;
             }
 
-            List<PresharedChunk> chunks = PresharedChunksIO.read(new ContextByteBuf(
+            List<PresharedChunk> chunks = PresharedChunksIO.read(GridPos.unpack(gridXZ), new ContextByteBuf(
                     Unpooled.wrappedBuffer(segment.asByteBuffer()),
                     registryAccess, ConnectionType.NEOFORGE
             ));
