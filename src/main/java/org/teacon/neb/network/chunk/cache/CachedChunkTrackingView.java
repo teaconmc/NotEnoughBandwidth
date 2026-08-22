@@ -81,12 +81,29 @@ public class CachedChunkTrackingView implements ChunkTrackingView {
         }
 
         if (includeNeighbors) {
-            for (int dx = -1; dx <= 1; dx++) {
-                for (int dz = -1; dz <= 1; dz++) {
-                    if ((dx != 0 || dz != 0) && cache.containsKey(ChunkPos.pack(x + dx, z + dz))) {
-                        return true;
-                    }
-                }
+            if (cache.containsKey(ChunkPos.pack(x - 1, z - 1))) {
+                return true;
+            }
+            if (cache.containsKey(ChunkPos.pack(x, z - 1))) {
+                return true;
+            }
+            if (cache.containsKey(ChunkPos.pack(x + 1, z - 1))) {
+                return true;
+            }
+            if (cache.containsKey(ChunkPos.pack(x - 1, z))) {
+                return true;
+            }
+            if (cache.containsKey(ChunkPos.pack(x + 1, z))) {
+                return true;
+            }
+            if (cache.containsKey(ChunkPos.pack(x - 1, z + 1))) {
+                return true;
+            }
+            if (cache.containsKey(ChunkPos.pack(x, z + 1))) {
+                return true;
+            }
+            if (cache.containsKey(ChunkPos.pack(x + 1, z + 1))) {
+                return true;
             }
         }
         

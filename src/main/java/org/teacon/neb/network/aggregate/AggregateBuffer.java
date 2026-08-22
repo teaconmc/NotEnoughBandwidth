@@ -7,9 +7,8 @@ import io.netty.util.AttributeKey;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.Packet;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.teacon.neb.NotEnoughBandwidth;
+import org.teacon.neb.network.SidedDelegate;
 import org.teacon.neb.network.aggregate.compress.CompressEncoder;
 
 import java.util.ArrayList;
@@ -19,9 +18,15 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public final class AggregateBuffer {
-    private final Queue<Packet<?>> buffer = new ConcurrentLinkedQueue<>();
-    private final Queue<ChannelFutureListener> listeners = new ConcurrentLinkedQueue<>();
     private final Connection connection;
+
+    private static final int BATCH = 200;
+
+    private List<Packet<?>> packets = new ArrayList<>(BATCH);
+    private final List<ChannelFutureListener> listeners = new ArrayList<>();
+
+    private final Queue<Packet<?>> asyncPackets = new ConcurrentLinkedQueue<>();
+    private final Queue<ChannelFutureListener> asyncListeners = new ConcurrentLinkedQueue<>();
 
     public AggregateBuffer(Connection connection) {
         this.connection = connection;
@@ -34,15 +39,18 @@ public final class AggregateBuffer {
     }
 
     public static void initialize(Connection connection) {
-        AggregateBuffer current = Objects.requireNonNull(accessAB(connection)).setIfAbsent(new AggregateBuffer(connection));
-        if (current != null && !current.buffer.isEmpty()) {
-            throw new IllegalStateException("Packets in the buffer has been sent!");
+        if (!Objects.requireNonNull(accessAB(connection)).compareAndSet(null, new AggregateBuffer(connection))) {
+            throw new IllegalStateException("Packets has been sent!");
         }
     }
 
     public static void release(Connection connection) {
         AggregateBuffer current = accessAB(connection).getAndSet(null);
         if (current != null) {
+            if (!SidedDelegate.select(connection).isSameThread()) {
+                throw new IllegalStateException("Non-managed thread can't send terminal packet.");
+            }
+
             current.flush();
         }
     }
@@ -53,48 +61,81 @@ public final class AggregateBuffer {
     }
 
     public void push(Packet<?> packet) {
-        this.buffer.add(packet);
+        if (SidedDelegate.select(connection).isSameThread()) {
+            packets.add(packet);
+            if (packets.size() == BATCH) {
+                ChannelFuture future = flushSpecific(packets);
+                packets = new ArrayList<>(BATCH);
+                for (ChannelFutureListener listener : listeners) {
+                    future.addListener(listener);
+                }
+                listeners.clear();
+            }
+        } else {
+            asyncPackets.add(packet);
+        }
     }
 
     public void push(ChannelFutureListener listener) {
-        this.listeners.add(listener);
+        if (SidedDelegate.select(connection).isSameThread()) {
+            listeners.add(listener);
+        } else {
+            asyncListeners.add(listener);
+        }
     }
 
     public void flush() {
+        if (!SidedDelegate.select(connection).isSameThread()) {
+            throw new IllegalStateException("Cannot flush on non-managed thread.");
+        }
+
         ChannelFuture future = flushPackets();
 
+        for (ChannelFutureListener listener : listeners) {
+            future.addListener(listener);
+        }
+        listeners.clear();
+
         ChannelFutureListener listener;
-        while ((listener = listeners.poll()) != null) {
+        while ((listener = asyncListeners.poll()) != null) {
             future.addListener(listener);
         }
     }
 
     private ChannelFuture flushPackets() {
-        if (buffer.isEmpty()) { // Should NOT be here regularly, but we can handle it anyway.
-            return flushPackets(List.of());
+        if (packets.isEmpty() && asyncPackets.isEmpty()) { // Should NOT be here regularly, but we can handle it anyway.
+            return flushSpecific(List.of());
+        }
+
+        List<Packet<?>> buffer;
+        if (packets.isEmpty()) {
+            buffer = new ArrayList<>(BATCH);
+        } else {
+            buffer = packets;
+            packets = new ArrayList<>(BATCH);
         }
 
         ChannelFuture last = null;
         while (true) {
-            List<Packet<?>> packets = new ArrayList<>(200);
-
             Packet<?> packet = null;
-            while (packets.size() < 200 && (packet = buffer.poll()) != null) {
-                packets.add(packet);
+            while (buffer.size() < BATCH && (packet = asyncPackets.poll()) != null) {
+                buffer.add(packet);
             }
 
-            if (!packets.isEmpty()) {
-                last = flushPackets(packets);
+            if (!buffer.isEmpty()) {
+                last = flushSpecific(buffer);
             }
 
             if (packet == null) {
-                return last != null ? last : flushPackets(List.of());
+                return last != null ? last : flushSpecific(List.of());
             }
+
+            buffer = new ArrayList<>(BATCH);
         }
     }
 
-    private ChannelFuture flushPackets(List<Packet<?>> packets) {
-        return this.connection.channel().writeAndFlush(new CompressEncoder.CompressedTransfer(switch (this.connection.getSending()) {
+    private ChannelFuture flushSpecific(List<Packet<?>> packets) {
+        return connection.channel().writeAndFlush(new CompressEncoder.CompressedTransfer(switch (connection.getSending()) {
             case CLIENTBOUND -> CompressedPacket.C_TYPE;
             case SERVERBOUND -> CompressedPacket.S_TYPE;
         }, packets));

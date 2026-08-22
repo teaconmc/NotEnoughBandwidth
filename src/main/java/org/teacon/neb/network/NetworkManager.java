@@ -3,19 +3,15 @@ package org.teacon.neb.network;
 import com.google.common.collect.ImmutableSet;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
-import net.minecraft.client.Minecraft;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.BundlePacket;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketType;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
-import net.minecraft.server.MinecraftServer;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.ModConfigSpec;
 import net.neoforged.neoforge.network.connection.ConnectionUtils;
-import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import org.teacon.neb.NEBConfigs;
 import org.teacon.neb.network.aggregate.AggregateBuffer;
 import org.teacon.neb.network.aggregate.CompressedPacket;
@@ -25,7 +21,6 @@ import org.teacon.neb.utils.ConfigAccess;
 
 import javax.annotation.Nullable;
 import java.util.Set;
-import java.util.function.BooleanSupplier;
 
 @EventBusSubscriber
 public final class NetworkManager {
@@ -55,37 +50,15 @@ public final class NetworkManager {
         if (conn == null) {
             return 3;
         }
-        ModConfigSpec.ConfigValue<Integer> v =  switch (conn.getSending()) {
+        ModConfigSpec.ConfigValue<Integer> v = switch (conn.getSending()) {
             case CLIENTBOUND -> NEBConfigs.PACKET_MAX_VARINT_SIZE_S2C;
             case SERVERBOUND -> NEBConfigs.PACKET_MAX_VARINT_SIZE_C2S;
         };
         return ConfigAccess.getOrDefault(v, 3);
     }
 
-    private static final BooleanSupplier CLIENT_PAUSE;
-
-    static {
-        if (FMLEnvironment.getDist().isDedicatedServer()) {
-            CLIENT_PAUSE = () -> false;
-        } else {
-            // noinspection Convert2Lambda, RedundantCast : prevent LinkageError on dedicated server.
-            CLIENT_PAUSE = (BooleanSupplier) new BooleanSupplier() {
-                @Override
-                public boolean getAsBoolean() {
-                    return Minecraft.getInstance().isPaused();
-                }
-            };
-        }
-    }
-
     private static boolean isPaused(Connection connection) {
-        return switch (connection.getSending()) {
-            case SERVERBOUND -> CLIENT_PAUSE.getAsBoolean();
-            case CLIENTBOUND -> {
-                MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
-                yield server != null && server.isPaused();
-            }
-        };
+        return SidedDelegate.select(connection).isPaused();
     }
 
     @Nullable
@@ -94,8 +67,17 @@ public final class NetworkManager {
         if (buffer == null) {
             return unwrapPacket(packet);
         } else if (isPaused(connection) || USER_BLACK_LIST.contains(unwrapType(packet))) {
-            buffer.flush();
-            return unwrapPacket(packet);
+            SidedDelegate delegate = SidedDelegate.select(connection);
+            if (delegate.isSameThread()) {
+                buffer.flush();
+                return unwrapPacket(packet);
+            } else {
+                delegate.execute(() -> {
+                    buffer.flush();
+                    connection.channel().writeAndFlush(unwrapPacket(packet));
+                });
+                return null;
+            }
         } else {
             enqueuePacket(connection, packet, buffer);
             if (sendListener != null) {
