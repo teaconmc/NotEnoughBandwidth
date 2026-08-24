@@ -2,22 +2,31 @@ package org.teacon.neb.network.aggregate;
 
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
-import io.netty.util.Attribute;
-import io.netty.util.AttributeKey;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.Packet;
 import org.jetbrains.annotations.Nullable;
-import org.teacon.neb.NotEnoughBandwidth;
 import org.teacon.neb.network.SidedDelegate;
 import org.teacon.neb.network.aggregate.compress.CompressEncoder;
+import org.teacon.neb.utils.vm.LookupAccess;
 
+import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public final class AggregateBuffer {
+    private static final VarHandle AGGREGATE_BUFFER;
+
+    static {
+        try {
+            // noinspection JavaLangInvokeHandleSignature : This field is injected by NEB, in ConnectionMixin.java
+            AGGREGATE_BUFFER = LookupAccess.IMPL_LOOKUP.findVarHandle(Connection.class, "nebw$aggregateBuffer", AggregateBuffer.class);
+        } catch (ReflectiveOperationException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
+
     private final Connection connection;
 
     private static final int BATCH = 200;
@@ -32,21 +41,16 @@ public final class AggregateBuffer {
         this.connection = connection;
     }
 
-    private static final AttributeKey<AggregateBuffer> BUFFER = AttributeKey.valueOf(NotEnoughBandwidth.id("buffer").toString());
-
-    private static Attribute<AggregateBuffer> accessAB(Connection connection) {
-        return connection.channel().attr(BUFFER);
-    }
-
     public static void initialize(Connection connection) {
-        if (!Objects.requireNonNull(accessAB(connection)).compareAndSet(null, new AggregateBuffer(connection))) {
+        if (!AGGREGATE_BUFFER.compareAndSet(connection, null, new AggregateBuffer(connection))) {
             throw new IllegalStateException("Packets has been sent!");
         }
     }
 
     public static void release(Connection connection) {
-        AggregateBuffer current = accessAB(connection).getAndSet(null);
+        AggregateBuffer current = (AggregateBuffer) AGGREGATE_BUFFER.getAndSet(connection, null);
         if (current != null) {
+            // FIXME: What if someone actually sends such packet outside Server Thread ??!
             if (!SidedDelegate.select(connection).isSameThread()) {
                 throw new IllegalStateException("Non-managed thread can't send terminal packet.");
             }
@@ -57,7 +61,7 @@ public final class AggregateBuffer {
 
     @Nullable
     public static AggregateBuffer get(Connection connection) {
-        return accessAB(connection).get();
+        return (AggregateBuffer) AGGREGATE_BUFFER.getOpaque(connection);
     }
 
     public void push(Packet<?> packet) {

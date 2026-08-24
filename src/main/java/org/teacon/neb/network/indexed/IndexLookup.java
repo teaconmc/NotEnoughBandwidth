@@ -4,27 +4,19 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import net.minecraft.resources.Identifier;
 import net.neoforged.neoforge.network.registration.PayloadRegistration;
-import org.jetbrains.annotations.Nullable;
 
+import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
 
 public final class IndexLookup {
     public static final int EMPTY_INT = -2;
 
-    private static final IndexLookup EMPTY_LOOKUP = new IndexLookup(List.of());
-    private static final AtomicReference<@Nullable IndexLookup> INSTANCE = new AtomicReference<>();
+    private static IndexLookup INSTANCE = new IndexLookup(List.of());
 
     public static IndexLookup getInstance() {
-        IndexLookup instance = INSTANCE.getPlain();
-        if (instance == null) {
-            instance = INSTANCE.get();
-        }
-
-        return Objects.requireNonNullElse(instance, EMPTY_LOOKUP);
+        return INSTANCE;
     }
 
     @SuppressWarnings({"UnstableApiUsage"})
@@ -38,7 +30,8 @@ public final class IndexLookup {
             packets.add(registration.id());
         }
 
-        INSTANCE.set(new IndexLookup(packets));
+        INSTANCE = new IndexLookup(packets);
+        VarHandle.fullFence();
     }
 
     private final Object2IntMap<Identifier> location2id;

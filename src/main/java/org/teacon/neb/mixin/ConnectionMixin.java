@@ -25,6 +25,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.teacon.neb.network.NetworkManager;
+import org.teacon.neb.network.aggregate.AggregateBuffer;
 import org.teacon.neb.network.aggregate.compress.CompressDecoder;
 import org.teacon.neb.network.aggregate.compress.CompressEncoder;
 import org.teacon.neb.utils.vm.LookupAccess;
@@ -36,6 +37,9 @@ import java.lang.invoke.VarHandle;
  */
 @Mixin(Connection.class)
 public abstract class ConnectionMixin {
+    @Unique // Injected to avoid reading it from Channel's attributes for better performance.
+    private AggregateBuffer nebw$aggregateBuffer;
+
     @Shadow
     private int sentPackets;
 
