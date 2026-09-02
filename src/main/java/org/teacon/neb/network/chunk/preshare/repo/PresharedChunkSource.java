@@ -139,9 +139,7 @@ public final class PresharedChunkSource {
         if (!shouldSchedule) {
             return Empty.INSTANCE;
         }
-        request = prepareL3(segment, gridXZ);
-        futures.put(gridXZ, request);
-        return new Pending(request.future);
+        return new Pending(prepareL3(segment, gridXZ));
     }
 
     private void liftL2(long gridXZ, @Nullable RequestResponse result) {
@@ -167,7 +165,7 @@ public final class PresharedChunkSource {
 
     private static final Executor VT_EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
 
-    private Request prepareL3(@Nullable MemorySegment loadedSegment, long gridXZ) {
+    private CompletableFuture<@Nullable RequestResponse> prepareL3(@Nullable MemorySegment loadedSegment, long gridXZ) {
         CompletableFuture<@Nullable MemorySegment> loadFuture;
         if (loadedSegment != null) {
             loadFuture = CompletableFuture.completedFuture(loadedSegment);
@@ -182,6 +180,7 @@ public final class PresharedChunkSource {
                             }
                         }
                     }
+                    return null;
                 } catch (Exception e) {
                     if (e instanceof IOException && e.getClass().getName().startsWith("java.net.")) {
                         LOGGER.warn("Cannot load preshared chunks: {}\n{}", GridPos.unpack(gridXZ), e.toString());
@@ -190,7 +189,6 @@ public final class PresharedChunkSource {
                     }
                     throw e instanceof RuntimeException re ? re : new RuntimeException(e);
                 }
-                return null;
             }, VT_EXECUTOR);
         }
 
@@ -207,6 +205,8 @@ public final class PresharedChunkSource {
         }, decompressor);
 
         Request request = new Request(System.currentTimeMillis(), parseFuture);
+        futures.put(gridXZ, request);
+
         record LiftFuture(
                 long gridXZ, WeakReference<PresharedChunkSource> self, WeakReference<Request> request
         ) implements Consumer<RequestResponse> { // Use an inline record here to avoid mistakenly capture 'this' and cause memory leak.
@@ -225,7 +225,13 @@ public final class PresharedChunkSource {
         }
         parseFuture.thenAcceptAsync(new LiftFuture(gridXZ, new WeakReference<>(this), new WeakReference<>(request)), managedThreadIdeExecutor);
 
-        return request;
+        parseFuture.whenComplete((_, t) -> {
+            if (t != null) {
+                LOGGER.warn("Cannot load a grid at {}, {}", GridPos.getX(gridXZ), GridPos.getZ(gridXZ), t);
+            }
+        });
+
+        return parseFuture;
     }
 
     public void close() {
@@ -240,10 +246,11 @@ public final class PresharedChunkSource {
         Thread.startVirtualThread(() -> {
             // Closing the arena after no tasks is access MemorySegment (s) on decompressor threadpool.
             try {
-                while (decompressor.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS)) {
+                while (!decompressor.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS)) {
                     Thread.yield();
                 }
             } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
             }
 
             arena.close();
