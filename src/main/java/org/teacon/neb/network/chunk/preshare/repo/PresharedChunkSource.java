@@ -223,13 +223,14 @@ public final class PresharedChunkSource {
                 }
             }
         }
-        parseFuture.thenAcceptAsync(new LiftFuture(gridXZ, new WeakReference<>(this), new WeakReference<>(request)), managedThreadIdeExecutor);
 
-        parseFuture.whenComplete((_, t) -> {
-            if (t != null) {
-                LOGGER.warn("Cannot load a grid at {}, {}", GridPos.getX(gridXZ), GridPos.getZ(gridXZ), t);
-            }
-        });
+        parseFuture
+                .thenAcceptAsync(new LiftFuture(gridXZ, new WeakReference<>(this), new WeakReference<>(request)), managedThreadIdeExecutor)
+                .whenComplete((_, t) -> {
+                    if (t != null) {
+                        LOGGER.warn("Cannot load a grid at {}, {}", GridPos.getX(gridXZ), GridPos.getZ(gridXZ), t);
+                    }
+                });
 
         return parseFuture;
     }
