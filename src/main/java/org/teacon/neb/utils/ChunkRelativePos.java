@@ -40,18 +40,26 @@ public record ChunkRelativePos(
     public static ChunkRelativePos unpack(int value) {
         short x = (short) ((value >> 24) & 0xFF);
         short z = (short) ((value >> 16) & 0xFF);
-        short y = (short) (value & 0x1FF);
+        short y = (short) ((value & 0x1FF) - 64);
         byte flag = (byte) ((value >> 9) & 0x7F);
 
         return new ChunkRelativePos(x, y, z, flag);
     }
 
     public int pack() {
-        return pack(x, y, z, flag);
+        return packUnchecked(x, y, z, flag);
     }
 
     public static int pack(short x, short y, short z, byte flag) {
-        return (x << 24) | (z << 16) | ((flag & 0x7F) << 9) | (y & 0x1FF);
+        Validate.inclusiveBetween(0, 15, x);
+        Validate.inclusiveBetween(-64, 383, y);
+        Validate.inclusiveBetween(0, 15, z);
+        Validate.inclusiveBetween(0, 127, flag);
+        return packUnchecked(x, y, z, flag);
+    }
+
+    public static int packUnchecked(short x, short y, short z, byte flag) {
+        return (x << 24) | (z << 16) | ((flag & 0x7F) << 9) | ((y + 64) & 0x1FF);
     }
 
     public ChunkRelativePos withFlag(byte flag) {

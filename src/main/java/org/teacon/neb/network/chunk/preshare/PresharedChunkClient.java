@@ -115,14 +115,16 @@ public class PresharedChunkClient {
     @Nullable
     private static Path locatePresharedDirectory(String version) throws IOException {
         Path root = Minecraft.getInstance().gameDirectory.toPath().resolve("preshared-chunks");
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(root)) {
-            for (Path edition : stream) {
-                if (Files.isDirectory(edition)) {
-                    Path index = PresharedChunkLocalSource.resolveIndex(edition);
-                    if (Files.isReadable(index) && version.equals(Files.readString(index, StandardCharsets.UTF_8))) {
-                        Path path = edition.normalize().toRealPath();
-                        if (path.startsWith(root.toRealPath())) {
-                            return path;
+        if (Files.isDirectory(root)) {
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(root)) {
+                for (Path edition : stream) {
+                    if (Files.isDirectory(edition)) {
+                        Path index = PresharedChunkLocalSource.resolveIndex(edition);
+                        if (Files.isReadable(index) && version.equals(Files.readString(index, StandardCharsets.UTF_8))) {
+                            Path path = edition.normalize().toRealPath();
+                            if (path.startsWith(root.toRealPath())) {
+                                return path;
+                            }
                         }
                     }
                 }

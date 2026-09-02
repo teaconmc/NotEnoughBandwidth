@@ -56,6 +56,10 @@ public class PresharedChunkServer {
 
     @SubscribeEvent
     private static void on(ServerStartedEvent event) throws IOException {
+        if (!NEBConfigs.PRESHARED_CHUNK_ENABLED.get()) {
+            return;
+        }
+
         MinecraftServer server = event.getServer();
         Path directory = server.getWorldPath(new LevelResource("preshared-chunks"));
         if (!Files.isDirectory(directory)) {
