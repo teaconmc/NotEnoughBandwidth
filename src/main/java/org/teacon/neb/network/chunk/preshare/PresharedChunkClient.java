@@ -148,8 +148,12 @@ public class PresharedChunkClient {
 
             LocalPlayer player = PresharedChunkPacketClientImpl.getLocalPlayer();
             PresharedChunkSource source = context.connection().channel().attr(SOURCE).get();
-            if (source == null || (player != null && player.level().dimension() != Level.OVERWORLD)) {
-                context.disconnect(Component.literal("Receiving unknown preshared-chunks: " + packet.pos()));
+            if (source == null) {
+                context.disconnect(Component.literal("Receiving unknown preshared-chunks " + packet.pos() + ": no source available in client!"));
+                return;
+            }
+            if (player != null && player.level().dimension() != Level.OVERWORLD) {
+                context.disconnect(Component.literal("Receiving unknown preshared-chunks " + packet.pos() + ": not in overworld!"));
                 return;
             }
 
@@ -192,7 +196,7 @@ public class PresharedChunkClient {
 
     private static void handle(PresharedChunkPacket packet, PresharedChunk chunk, IPayloadContext context, LocalPlayer player) {
         if (player.level().dimension() != Level.OVERWORLD) {
-            context.disconnect(Component.literal("Receiving unknown preshared-chunks: " + packet.pos()));
+            context.disconnect(Component.literal("Receiving unknown preshared-chunks: " + packet.pos() + ": not in overworld!"));
             return;
         }
 

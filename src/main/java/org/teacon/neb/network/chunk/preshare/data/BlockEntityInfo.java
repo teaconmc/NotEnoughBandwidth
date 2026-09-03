@@ -16,14 +16,12 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.chunk.LevelChunk;
 import org.apache.commons.lang3.Validate;
-import org.jetbrains.annotations.Nullable;
 import org.teacon.neb.utils.ChunkRelativePos;
 import org.teacon.neb.utils.ContextByteBuf;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 public record BlockEntityInfo(
         ChunkRelativePos pos,
@@ -75,10 +73,21 @@ public record BlockEntityInfo(
 
     public record Diff(
             ChunkRelativePos pos,
-            @Nullable BlockEntityType<?> type,
-            @Nullable CompoundTag tag
+            UpdateOperation operation
     ) {
-        private static final byte FLAG_NULL_NULL = 0, FLAG_NULL_VALUE = 1, FLAG_VALUE_VALUE = 2;
+        private sealed interface UpdateOperation {
+            record Remove() implements UpdateOperation {
+                private static final Remove INSTANCE = new Remove();
+            }
+
+            record Set(BlockEntityType<?> type, CompoundTag tag) implements UpdateOperation {
+            }
+
+            record UpdateValue(CompoundTag tag) implements UpdateOperation {
+            }
+
+            byte REMOVE = 0, UPDATE = 1, SET = 2;
+        }
 
         public static final StreamCodec<RegistryFriendlyByteBuf, Diff> STREAM_CODEC = new StreamCodec<>() {
             private static final StreamCodec<RegistryFriendlyByteBuf, BlockEntityType<?>> BE_TYPE_CODEC =
@@ -87,42 +96,37 @@ public record BlockEntityInfo(
             @Override
             public Diff decode(RegistryFriendlyByteBuf buffer) {
                 ChunkRelativePos pos = ChunkRelativePos.STREAM_CODEC.decode(buffer);
-
-                BlockEntityType<?> type = null;
-                CompoundTag tag = null;
-                switch (pos.flag()) {
-                    case FLAG_NULL_NULL -> {
-                    }
-                    case FLAG_NULL_VALUE -> tag = buffer.readNbt();
-                    case FLAG_VALUE_VALUE -> {
-                        type = BE_TYPE_CODEC.decode(buffer);
-                        tag = buffer.readNbt();
+                UpdateOperation operation = switch (pos.flag()) {
+                    case UpdateOperation.REMOVE -> UpdateOperation.Remove.INSTANCE;
+                    case UpdateOperation.UPDATE -> new UpdateOperation.UpdateValue(buffer.readNbt());
+                    case UpdateOperation.SET -> {
+                        BlockEntityType<?> type = BE_TYPE_CODEC.decode(buffer);
+                        CompoundTag tag = buffer.readNbt();
+                        yield new UpdateOperation.Set(type, tag);
                     }
                     default -> throw new IllegalArgumentException("Illegal flag: " + pos.flag());
-                }
+                };
 
-                return new Diff(pos.withFlag((byte) 0), type, tag);
+                return new Diff(pos.withFlag((byte) 0), operation);
             }
 
             @Override
             public void encode(RegistryFriendlyByteBuf buffer, Diff value) {
-                byte flag;
-                if (value.type == null) {
-                    if (value.tag == null) {
-                        flag = FLAG_NULL_NULL;
-                    } else {
-                        flag = FLAG_NULL_VALUE;
-                    }
-                } else {
-                    flag = FLAG_VALUE_VALUE;
-                }
+                byte flag = switch (value.operation) {
+                    case UpdateOperation.Remove _ -> UpdateOperation.REMOVE;
+                    case UpdateOperation.UpdateValue _ -> UpdateOperation.UPDATE;
+                    case UpdateOperation.Set _ -> UpdateOperation.SET;
+                };
 
                 ChunkRelativePos.STREAM_CODEC.encode(buffer, value.pos.withFlag(flag));
-                if (value.type != null) {
-                    BE_TYPE_CODEC.encode(buffer, value.type);
-                }
-                if (value.tag != null) {
-                    buffer.writeNbt(value.tag);
+                switch (value.operation) {
+                    case UpdateOperation.Remove _ -> {
+                    }
+                    case UpdateOperation.UpdateValue(CompoundTag tag) -> buffer.writeNbt(tag);
+                    case UpdateOperation.Set(BlockEntityType<?> type, CompoundTag tag) -> {
+                        BE_TYPE_CODEC.encode(buffer, type);
+                        buffer.writeNbt(tag);
+                    }
                 }
             }
         };
@@ -141,17 +145,18 @@ public record BlockEntityInfo(
 
                 BlockEntityInfo previous = base.get(posPacked);
                 if (previous == null || previous.type != type) {
-                    blockEntities.add(new Diff(pos, type, tag));
-                } else {
-                    blockEntities.add(new Diff(pos, null, tag));
+                    blockEntities.add(new Diff(pos, new UpdateOperation.Set(type, tag)));
+                } else if (!tag.equals(previous.data)) {
+                    blockEntities.add(new Diff(pos, new UpdateOperation.UpdateValue(tag)));
                 }
+
                 existed.add(posPacked);
             }
 
             for (Int2ObjectMap.Entry<BlockEntityInfo> entry : base.int2ObjectEntrySet()) {
                 int pos = entry.getIntKey();
                 if (!existed.contains(pos)) {
-                    blockEntities.add(new Diff(ChunkRelativePos.unpack(pos), null, null));
+                    blockEntities.add(new Diff(ChunkRelativePos.unpack(pos), UpdateOperation.Remove.INSTANCE));
                 }
             }
 
@@ -164,15 +169,17 @@ public record BlockEntityInfo(
             for (Diff diff : diffs) {
                 int packedPos = diff.pos.pack();
 
-                if (diff.type == null) {
-                    if (diff.tag == null) { // Remove
+                switch (diff.operation) {
+                    case UpdateOperation.Remove _ -> {
                         Validate.notNull(blockEntities.remove(packedPos), "Cannot remove an inexistent block entity at " + diff.pos);
-                    } else { // Update data
-                        BlockEntityInfo info = Validate.notNull(blockEntities.get(packedPos), "Cannot update an inexistent block entity at " + diff.pos);
-                        blockEntities.put(packedPos, new BlockEntityInfo(info.pos, info.type, diff.tag));
                     }
-                } else { // Add
-                    blockEntities.put(packedPos, new BlockEntityInfo(diff.pos, diff.type, Objects.requireNonNull(diff.tag)));
+                    case UpdateOperation.UpdateValue(CompoundTag tag) -> {
+                        BlockEntityInfo info = Validate.notNull(blockEntities.get(packedPos), "Cannot update an inexistent block entity at " + diff.pos);
+                        blockEntities.put(packedPos, new BlockEntityInfo(info.pos, info.type, tag));
+                    }
+                    case UpdateOperation.Set(BlockEntityType<?> type, CompoundTag tag) -> {
+                        blockEntities.put(packedPos, new BlockEntityInfo(diff.pos, type, tag));
+                    }
                 }
             }
 
