@@ -133,7 +133,7 @@ public final class CompressContext implements AutoCloseable {
             return compressed.readBytes(compressed.readableBytes());
         }
 
-        if (size >= 16 * 1024 * 1024) {
+        if (size >= 64 * 1024 * 1024) {
             throw new IllegalStateException("Frame is too big: " + size);
         }
 
