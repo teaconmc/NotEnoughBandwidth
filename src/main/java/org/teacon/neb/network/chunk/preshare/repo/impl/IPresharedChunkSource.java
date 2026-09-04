@@ -11,6 +11,9 @@ public interface IPresharedChunkSource {
     @Nullable
     Path tryLoad(long grid) throws IOException;
 
+    default void tryCache(long grid, Path result) throws IOException {
+    }
+
     default void close() throws IOException {
     }
 }

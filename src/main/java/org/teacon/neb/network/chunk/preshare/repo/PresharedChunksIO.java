@@ -8,15 +8,23 @@ import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerChunkCache;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.Ticket;
 import net.minecraft.server.level.TicketType;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ImposterProtoChunk;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.ProtoChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.chunk.status.ChunkType;
+import net.minecraft.world.level.storage.TagValueInput;
+import net.minecraft.world.level.storage.ValueInput;
 import net.neoforged.neoforge.network.connection.ConnectionType;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import org.slf4j.Logger;
@@ -149,14 +157,28 @@ public final class PresharedChunksIO {
                                             server
                                     )
                                     .thenAccept(chunk -> {
-                                        LevelChunk loaded = switch (chunk.orElseThrow(IllegalStateException::new)) {
+                                        if (chunk.getError() != null) {
+                                            throw new IllegalArgumentException(String.format("Cannot load chunk at %d, %d: %s", chunkX, chunkX, chunk.getError()));
+                                        }
+
+                                        LevelChunk loaded = switch (chunk.orElseThrow(AssertionError::new)) {
                                             case LevelChunk c -> c;
                                             case ImposterProtoChunk c -> c.getWrapped();
-                                            case ProtoChunk proto -> new LevelChunk(chunkSource.level, proto, _ -> {
-                                            });
+                                            case ProtoChunk proto -> {
+                                                ServerLevel level = chunkSource.level;
+                                                yield new LevelChunk(level, proto, _ -> {
+                                                    try (ProblemReporter.ScopedCollector reporter = new ProblemReporter.ScopedCollector(proto.problemPath(), LOGGER)) {
+                                                        ValueInput.ValueInputList entities = TagValueInput.create(reporter, level.registryAccess(), proto.getEntities());
+                                                        if (!entities.isEmpty()) {
+                                                            level.addWorldGenChunkEntities(EntityType.loadEntitiesRecursive(entities, level, EntitySpawnReason.LOAD));
+                                                        }
+                                                    }
+                                                });
+                                            }
                                             default -> throw new UnsupportedOperationException();
                                         };
 
+                                        loaded.runPostLoad();
                                         values[index] = PresharedChunk.createCache(loaded);
                                     });
                         }

@@ -49,6 +49,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -70,10 +71,7 @@ public class PresharedChunkClient {
 
         String version = connection.channel().attr(SOURCE_VERSION).get();
         if (version != null && !version.isEmpty()) {
-            Path path = locatePresharedDirectory(version);
-            if (path != null) {
-                sources.add(new PresharedChunkLocalSource(path));
-            }
+            sources.add(new PresharedChunkLocalSource(locatePresharedDirectory(connection, version)));
 
             String url = NEBConfigs.PRESHARED_CHUNK_DYNAMIC_DISPATCH_URL.get();
             if (!url.isEmpty()) {
@@ -113,9 +111,9 @@ public class PresharedChunkClient {
         }
     }
 
-    @Nullable
-    private static Path locatePresharedDirectory(String version) throws IOException {
+    private static Path locatePresharedDirectory(Connection conn, String version) throws IOException {
         Path root = Minecraft.getInstance().gameDirectory.toPath().resolve("preshared-chunks");
+
         if (Files.isDirectory(root)) {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(root)) {
                 for (Path edition : stream) {
@@ -132,7 +130,7 @@ public class PresharedChunkClient {
             }
         }
 
-        return null;
+        return root.resolve("b64#" + Base64.getEncoder().encodeToString(conn.getLoggableAddress(true).getBytes(StandardCharsets.UTF_8)) + "#" + version);
     }
 
     @SubscribeEvent

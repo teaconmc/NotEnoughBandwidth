@@ -174,15 +174,31 @@ public final class PresharedChunkSource {
         } else {
             loadFuture = CompletableFuture.supplyAsync(() -> {
                 try {
-                    for (IPresharedChunkSource source : sources) {
-                        Path path = source.tryLoad(gridXZ);
-                        if (path != null) {
-                            try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ)) {
-                                return channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size(), arena);
-                            }
+                    Path path = null;
+
+                    int i = 0;
+                    for (; i < sources.size(); i++) {
+                        if ((path = sources.get(i).tryLoad(gridXZ)) != null) {
+                            break;
                         }
                     }
-                    return null;
+
+                    if (path == null) {
+                        return null;
+                    }
+
+                    for (i--; i >= 0; i--) {
+                        try {
+                            sources.get(i).tryCache(gridXZ, path);
+
+                        } catch (IOException e) {
+                            LOGGER.warn("Cannot cache preshared chunks: {}\n{}", GridPos.unpack(gridXZ), e.toString());
+                        }
+                    }
+
+                    try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ)) {
+                        return channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size(), arena);
+                    }
                 } catch (Exception e) {
                     if (e instanceof IOException && e.getClass().getName().startsWith("java.net.")) {
                         LOGGER.warn("Cannot load preshared chunks: {}\n{}", GridPos.unpack(gridXZ), e.toString());

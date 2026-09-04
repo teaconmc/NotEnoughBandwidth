@@ -1,6 +1,8 @@
 package org.teacon.neb.network.chunk.preshare.data.palette;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -138,7 +140,7 @@ public record PalettedContainerChange<T>(byte bitsInMemory, byte bitsInStorage, 
 
     private static <T> byte @NonNull [] getPaletteData(PalettedContainerRO<T> current) {
         byte[] paletteData;
-        FriendlyByteBuf paletteBuffer = new FriendlyByteBuf(Unpooled.directBuffer(1024));
+        FriendlyByteBuf paletteBuffer = new FriendlyByteBuf(PooledByteBufAllocator.DEFAULT.directBuffer(1024));
         try {
             getPalette(current).write(paletteBuffer, getStrategy(current).globalMap());
 
