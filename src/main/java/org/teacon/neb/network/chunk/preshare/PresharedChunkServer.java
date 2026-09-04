@@ -67,6 +67,7 @@ public class PresharedChunkServer {
         }
 
         source = new PresharedChunkSource(
+                NEBConfigs.PRESHARED_CHUNK_CACHE_L1_MAX_SERVER.get(),
                 event.getServer(),
                 server.registryAccess(),
                 PresharedChunksIO.ofExecutorService("Server Chunk Decompressor [Native]"),
@@ -186,7 +187,7 @@ public class PresharedChunkServer {
                 values[0] = gridXZ;
             }
 
-            values[1] = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(NEBConfigs.PRESHARED_CHUNK_RETRY_TIMEOUT.get() + 2);
+            values[1] = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(NEBConfigs.PRESHARED_CHUNK_FAILURE_COOLDOWN.get() + 2);
         }
 
         public static void clearRejected(long[] values, long gridXZ) {

@@ -94,6 +94,7 @@ public class PresharedChunkClient {
             return;
         }
         sourceAttribute.set(new PresharedChunkSource(
+                NEBConfigs.PRESHARED_CHUNK_CACHE_L1_MAX_CLIENT.get(),
                 connection.channel().eventLoop(),
                 registryAccess,
                 PresharedChunksIO.ofExecutorService("Client Chunk Decompressor [Native]"),

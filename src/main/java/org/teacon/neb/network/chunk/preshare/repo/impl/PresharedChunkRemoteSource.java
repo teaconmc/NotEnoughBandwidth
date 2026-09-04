@@ -2,6 +2,7 @@ package org.teacon.neb.network.chunk.preshare.repo.impl;
 
 import net.minecraft.world.level.ChunkPos;
 import org.jspecify.annotations.Nullable;
+import org.teacon.neb.NEBConfigs;
 import org.teacon.neb.NotEnoughBandwidth;
 
 import java.io.IOException;
@@ -41,7 +42,7 @@ public class PresharedChunkRemoteSource implements IPresharedChunkSource {
                             .GET()
                             .uri(URI.create(String.format(url, version, ChunkPos.getX(grid), ChunkPos.getZ(grid))))
                             .header("User-Agent", "NotEnoughBandwidth/" + NotEnoughBandwidth.MOD_CONTAINER.getModInfo().getVersion().toString())
-                            .timeout(Duration.ofSeconds(10))
+                            .timeout(Duration.ofSeconds(NEBConfigs.PRESHARED_CHUNK_REQUEST_TIMEOUT.get()))
                             .build(),
                     HttpResponse.BodyHandlers.ofFile(file)
             );

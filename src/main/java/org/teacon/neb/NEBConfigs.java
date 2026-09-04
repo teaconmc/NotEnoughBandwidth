@@ -38,8 +38,10 @@ public final class NEBConfigs {
     public static ModConfigSpec.ConfigValue<Boolean> PRESHARED_CHUNK_ENABLED;
     public static ModConfigSpec.ConfigValue<String> PRESHARED_CHUNK_DYNAMIC_DISPATCH_URL;
     public static ModConfigSpec.ConfigValue<Integer> PRESHARED_CHUNK_COMPRESS_LEVEL;
-    public static ModConfigSpec.ConfigValue<Integer> PRESHARED_CHUNK_CACHE_L1_MAX;
-    public static ModConfigSpec.ConfigValue<Integer> PRESHARED_CHUNK_RETRY_TIMEOUT;
+    public static ModConfigSpec.ConfigValue<Integer> PRESHARED_CHUNK_CACHE_L1_MAX_SERVER;
+    public static ModConfigSpec.ConfigValue<Integer> PRESHARED_CHUNK_CACHE_L1_MAX_CLIENT;
+    public static ModConfigSpec.ConfigValue<Integer> PRESHARED_CHUNK_REQUEST_TIMEOUT;
+    public static ModConfigSpec.ConfigValue<Integer> PRESHARED_CHUNK_FAILURE_COOLDOWN;
 
     public static ModConfigSpec.ConfigValue<Integer> PACKET_MAX_VARINT_SIZE_C2S;
     public static ModConfigSpec.ConfigValue<Integer> PACKET_MAX_VARINT_SIZE_S2C;
@@ -50,7 +52,7 @@ public final class NEBConfigs {
     @SubscribeEvent
     private static void on(FMLConstructModEvent event) {
         ModConfigSpec.Builder server = new ModConfigSpec.Builder();
-        ModConfigSpec.Builder common = new ModConfigSpec.Builder();
+        ModConfigSpec.Builder client = new ModConfigSpec.Builder();
 
         COMPRESS_WINDOW_SIZE_LOG = server
                 .comment(formatComments("""
@@ -112,12 +114,29 @@ public final class NEBConfigs {
         PRESHARED_CHUNK_COMPRESS_LEVEL = server
                 .comment(formatComments("ZSTD compression level for the Preshared Chunk Bundle."))
                 .defineInRange("compress_level", 22, 0, Integer.MAX_VALUE);
-        PRESHARED_CHUNK_CACHE_L1_MAX = common.comment(formatComments("Cache L1's max size"))
-                .define("chunk_cdn.cache_l1_max", 2048);
-        PRESHARED_CHUNK_RETRY_TIMEOUT = server
+        PRESHARED_CHUNK_CACHE_L1_MAX_SERVER = server
+                .comment(formatComments("Cache L1's max size"))
+                .define("cache_l1_max", 2048);
+        PRESHARED_CHUNK_REQUEST_TIMEOUT = server
                 .comment(formatComments("Seconds to wait before fetching preshared chunks from dynamic_dispatch_url"))
-                .define("retry_timeout", 10);
+                .define("request_timeout", 10);
+        PRESHARED_CHUNK_FAILURE_COOLDOWN = server
+                .comment(formatComments("""
+                        After a request fails, subsequent requests will be considered failed
+                        without making another request for this amount of time (in seconds).
+                        """))
+                .define("failure_cooldown", 30);
         server.pop();
+
+        client.comment(formatComments("""
+                        Dispatch chunks in third-party approaches.
+                        When syncing chunks, the server sends a small diff instead of full data, reducing network bandwidth usage.
+                        """))
+                .push("chunk_cdn");
+        PRESHARED_CHUNK_CACHE_L1_MAX_CLIENT = client
+                .comment(formatComments("Cache L1's max size"))
+                .define("cache_l1_max", 256);
+        client.pop();
 
         server.push("packet");
         server.comment(formatComments("""
@@ -141,10 +160,10 @@ public final class NEBConfigs {
                 );
         server.pop();
 
-        ModConfigSpec serverSpec = server.build(), commonSpec = common.build();
+        ModConfigSpec serverSpec = server.build(), clientSpec = client.build();
         NotEnoughBandwidth.MOD_CONTAINER.registerConfig(ModConfig.Type.SERVER, serverSpec);
-        NotEnoughBandwidth.MOD_CONTAINER.registerConfig(ModConfig.Type.COMMON, commonSpec);
-        CONFIG_SPECS = List.of(serverSpec, commonSpec);
+        NotEnoughBandwidth.MOD_CONTAINER.registerConfig(ModConfig.Type.CLIENT, clientSpec);
+        CONFIG_SPECS = List.of(serverSpec, clientSpec);
     }
 
     @EventBusSubscriber(Dist.CLIENT)

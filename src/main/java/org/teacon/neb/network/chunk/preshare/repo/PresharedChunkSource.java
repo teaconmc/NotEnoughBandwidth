@@ -42,6 +42,7 @@ public final class PresharedChunkSource {
     private final RegistryAccess registryAccess;
     private final Executor managedThreadIdeExecutor;
     private final Thread managedThread = Thread.currentThread();
+    private final int cacheL1Max;
 
     private final Arena arena = Arena.ofShared();
 
@@ -59,7 +60,8 @@ public final class PresharedChunkSource {
     /// grid_pos -> async request
     private final Long2ObjectLinkedOpenHashMap<Request> futures = new Long2ObjectLinkedOpenHashMap<>();
 
-    public PresharedChunkSource(Executor managedThreadIdeExecutor, RegistryAccess registryAccess, ExecutorService decompressor, List<IPresharedChunkSource> sources) {
+    public PresharedChunkSource(int cacheL1Max, Executor managedThreadIdeExecutor, RegistryAccess registryAccess, ExecutorService decompressor, List<IPresharedChunkSource> sources) {
+        this.cacheL1Max = cacheL1Max;
         this.managedThreadIdeExecutor = managedThreadIdeExecutor;
         this.decompressor = decompressor;
         this.sources = sources;
@@ -128,7 +130,7 @@ public final class PresharedChunkSource {
                 return new Pending(request.future);
             }
             case FAILED, CANCELLED -> {
-                if (request.timestamp >= System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(NEBConfigs.PRESHARED_CHUNK_RETRY_TIMEOUT.get())) {
+                if (request.timestamp >= System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(NEBConfigs.PRESHARED_CHUNK_FAILURE_COOLDOWN.get())) {
                     return Failed.INSTANCE;
                 } else {
                     futures.remove(gridXZ);
@@ -149,7 +151,7 @@ public final class PresharedChunkSource {
         }
         cacheL2.putIfAbsent(gridXZ, result.segment);
 
-        int expected = NEBConfigs.PRESHARED_CHUNK_CACHE_L1_MAX.get() - result.chunks.size();
+        int expected = cacheL1Max - result.chunks.size();
         if (expected <= 0) {
             cacheL1.clear();
         } else {
