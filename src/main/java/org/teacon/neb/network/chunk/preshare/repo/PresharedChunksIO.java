@@ -8,7 +8,6 @@ import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
@@ -22,7 +21,6 @@ import net.minecraft.world.level.chunk.ImposterProtoChunk;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.ProtoChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-import net.minecraft.world.level.chunk.status.ChunkType;
 import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.level.storage.ValueInput;
 import net.neoforged.neoforge.network.connection.ConnectionType;
@@ -156,7 +154,7 @@ public final class PresharedChunksIO {
                                             _ -> ChunkSourceAccess.getChunkFutureMainThread(chunkSource, chunkX, chunkZ, ChunkStatus.SPAWN, false),
                                             server
                                     )
-                                    .thenAccept(chunk -> {
+                                    .thenAcceptAsync(chunk -> {
                                         if (chunk.getError() != null) {
                                             throw new IllegalArgumentException(String.format("Cannot load chunk at %d, %d: %s", chunkX, chunkX, chunk.getError()));
                                         }
@@ -180,7 +178,7 @@ public final class PresharedChunksIO {
 
                                         loaded.runPostLoad();
                                         values[index] = PresharedChunk.createCache(loaded);
-                                    });
+                                    }, server);
                         }
 
                         return CompletableFuture.allOf(futures).thenApply(_ -> values)
