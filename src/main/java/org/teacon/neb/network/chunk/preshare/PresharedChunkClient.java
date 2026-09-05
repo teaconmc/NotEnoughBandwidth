@@ -18,6 +18,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
@@ -112,7 +113,7 @@ public class PresharedChunkClient {
     }
 
     private static Path locatePresharedDirectory(Connection conn, String version) throws IOException {
-        Path root = Minecraft.getInstance().gameDirectory.toPath().resolve("preshared-chunks");
+        Path root = FMLPaths.CONFIGDIR.get().resolve("nebw/preshared-chunks");
 
         if (Files.isDirectory(root)) {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(root)) {

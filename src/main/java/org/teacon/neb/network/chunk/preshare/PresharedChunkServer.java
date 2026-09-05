@@ -8,16 +8,15 @@ import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraft.world.level.storage.LevelResource;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.network.configuration.ICustomConfigurationTask;
@@ -56,12 +55,12 @@ public class PresharedChunkServer {
 
     @SubscribeEvent
     private static void on(ServerStartedEvent event) throws IOException {
-        if (!NEBConfigs.PRESHARED_CHUNK_ENABLED.get()) {
+        String instance = NEBConfigs.PRESHARED_CHUNK_INSTANCE.get();
+        if (instance.isEmpty()) {
             return;
         }
 
-        MinecraftServer server = event.getServer();
-        Path directory = server.getWorldPath(new LevelResource("preshared-chunks"));
+        Path directory = FMLPaths.CONFIGDIR.get().resolve("nebw/preshared-chunks/" + instance);
         if (!Files.isDirectory(directory)) {
             return;
         }
@@ -69,7 +68,7 @@ public class PresharedChunkServer {
         source = new PresharedChunkSource(
                 NEBConfigs.PRESHARED_CHUNK_CACHE_L1_MAX_SERVER.get(),
                 event.getServer(),
-                server.registryAccess(),
+                event.getServer().registryAccess(),
                 PresharedChunksIO.ofExecutorService("Server Chunk Decompressor [Native]"),
                 List.of(new PresharedChunkLocalSource(directory))
         );

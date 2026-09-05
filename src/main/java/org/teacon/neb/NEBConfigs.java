@@ -35,7 +35,7 @@ public final class NEBConfigs {
     public static ModConfigSpec.ConfigValue<Integer> CHUNK_CACHE_DISTANCE;
     public static ModConfigSpec.ConfigValue<Integer> CHUNK_CACHE_TIMEOUT;
 
-    public static ModConfigSpec.ConfigValue<Boolean> PRESHARED_CHUNK_ENABLED;
+    public static ModConfigSpec.ConfigValue<String> PRESHARED_CHUNK_INSTANCE;
     public static ModConfigSpec.ConfigValue<String> PRESHARED_CHUNK_DYNAMIC_DISPATCH_URL;
     public static ModConfigSpec.ConfigValue<Integer> PRESHARED_CHUNK_COMPRESS_LEVEL;
     public static ModConfigSpec.ConfigValue<Integer> PRESHARED_CHUNK_CACHE_L1_MAX_SERVER;
@@ -100,10 +100,10 @@ public final class NEBConfigs {
                         When syncing chunks, the server sends a small diff instead of full data, reducing network bandwidth usage.
                         """))
                 .push("chunk_cdn");
-        PRESHARED_CHUNK_ENABLED = server.comment(formatComments("""
-                        Whether to enable this feature.
+        PRESHARED_CHUNK_INSTANCE = server.comment(formatComments("""
+                        The currently active preshared chunk version.
                         """))
-                .define("enabled", true);
+                .define("version", "");
         PRESHARED_CHUNK_DYNAMIC_DISPATCH_URL = server.comment(formatComments("""
                         Loads chunks from remove server, accepting http (DONOT USE THIS IN PRODUCTION SERVER!) and https protocol,
                         with Java String#format styled placeholders for %1$s (version), %2$d (gridX), %3$d (gridZ).
