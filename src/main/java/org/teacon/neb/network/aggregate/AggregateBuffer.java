@@ -1,5 +1,6 @@
 package org.teacon.neb.network.aggregate;
 
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import net.minecraft.network.Connection;
@@ -68,7 +69,7 @@ public final class AggregateBuffer {
         if (SidedDelegate.select(connection).isSameThread()) {
             packets.add(packet);
             if (packets.size() == BATCH) {
-                ChannelFuture future = flushSpecific(packets);
+                ChannelFuture future = sendSpecific(packets);
                 packets = new ArrayList<>(BATCH);
                 for (ChannelFutureListener listener : listeners) {
                     future.addListener(listener);
@@ -93,7 +94,7 @@ public final class AggregateBuffer {
             throw new IllegalStateException("Cannot flush on non-managed thread.");
         }
 
-        ChannelFuture future = flushPackets();
+        ChannelFuture future = sendPackets();
 
         for (ChannelFutureListener listener : listeners) {
             future.addListener(listener);
@@ -104,11 +105,14 @@ public final class AggregateBuffer {
         while ((listener = asyncListeners.poll()) != null) {
             future.addListener(listener);
         }
+
+        Channel channel = connection.channel();
+        channel.eventLoop().execute(channel::flush);
     }
 
-    private ChannelFuture flushPackets() {
+    private ChannelFuture sendPackets() {
         if (packets.isEmpty() && asyncPackets.isEmpty()) { // Should NOT be here regularly, but we can handle it anyway.
-            return flushSpecific(List.of());
+            return sendSpecific(List.of());
         }
 
         List<Packet<?>> buffer;
@@ -127,19 +131,19 @@ public final class AggregateBuffer {
             }
 
             if (!buffer.isEmpty()) {
-                last = flushSpecific(buffer);
+                last = sendSpecific(buffer);
             }
 
             if (packet == null) {
-                return last != null ? last : flushSpecific(List.of());
+                return last != null ? last : sendSpecific(List.of());
             }
 
             buffer = new ArrayList<>(BATCH);
         }
     }
 
-    private ChannelFuture flushSpecific(List<Packet<?>> packets) {
-        return connection.channel().writeAndFlush(new CompressEncoder.CompressedTransfer(switch (connection.getSending()) {
+    private ChannelFuture sendSpecific(List<Packet<?>> packets) {
+        return connection.channel().write(new CompressEncoder.CompressedTransfer(switch (connection.getSending()) {
             case CLIENTBOUND -> CompressedPacket.C_TYPE;
             case SERVERBOUND -> CompressedPacket.S_TYPE;
         }, packets));
